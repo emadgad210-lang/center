@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سبّورة | لوحة تحكم السنتر</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Rakkas&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- صفحة تسجيل الدخول -->
+  <div class="login-page" id="login-page">
+    <div class="login-container">
+      <div class="login-box">
+        <div class="login-header">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" width="40" height="40">
+              <rect x="3" y="6" width="34" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+              <line x1="9" y1="14" x2="24" y2="14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+              <line x1="9" y1="20" x2="30" y2="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <h1>سبّورة</h1>
+          <p class="login-subtitle">لوحة تحكم السنتر التعليمي</p>
+        </div>
+
+        <form id="login-form" class="login-form">
+          <div class="form-group">
+            <label for="login-email">البريد الإلكتروني أو اسم المستخدم</label>
+            <input type="text" id="login-email" name="email" placeholder="أدخل البريد" required>
+          </div>
+          <div class="form-group">
+            <label for="login-password">كلمة المرور</label>
+            <input type="password" id="login-password" name="password" placeholder="أدخل كلمة المرور" required>
+          </div>
+          <div class="form-group">
+            <label for="login-role">تسجيل كـ</label>
+            <select id="login-role" name="role" required>
+              <option value="admin">مسؤول السنتر</option>
+              <option value="teacher">معلم</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">دخول</button>
+          <p class="login-hint" id="login-hint"></p>
+        </form>
+
+        <div class="demo-credentials">
+          <p><strong>🔑 بيانات تجريبية:</strong></p>
+          <p>أدمن: admin / password123</p>
+          <p>معلم: teacher@school.com / teacher123</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- الواجهة الرئيسية -->
+  <div class="dashboard-wrapper" id="dashboard-wrapper" hidden>
+
+    <!-- الشريط الجانبي -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="26" height="26">
+            <rect x="3" y="6" width="34" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+            <line x1="9" y1="14" x2="24" y2="14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="9" y1="20" x2="30" y2="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        سبّورة
+      </div>
+
+      <div class="user-info" id="user-info">
+        <div class="user-avatar">👤</div>
+        <div class="user-details">
+          <p class="user-name" id="user-name">المستخدم</p>
+          <p class="user-role" id="user-role">دور</p>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <button class="nav-item is-active" data-page="dashboard">
+          <span class="nav-label">الرئيسية</span>
+        </button>
+        <button class="nav-item admin-only" data-page="students">
+          <span class="nav-label">الطلاب</span>
+        </button>
+        <button class="nav-item admin-only" data-page="teachers">
+          <span class="nav-label">المعلمين</span>
+        </button>
+        <button class="nav-item admin-only" data-page="classes">
+          <span class="nav-label">الحصص</span>
+        </button>
+        <button class="nav-item" data-page="attendance">
+          <span class="nav-label">الحضور والغياب</span>
+        </button>
+        <button class="nav-item admin-only" data-page="holidays">
+          <span class="nav-label">الإجازات</span>
+        </button>
+        <button class="nav-item admin-only" data-page="fees">
+          <span class="nav-label">الشهريات</span>
+        </button>
+        <button class="nav-item admin-only" data-page="expenses">
+          <span class="nav-label">مصروفات السنتر</span>
+        </button>
+        <button class="nav-item admin-only" data-page="registrations">
+          <span class="nav-label">استمارات طلاب جدد</span>
+          <span class="nav-badge" id="reg-badge" hidden>0</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-outline btn-block" id="logout-btn">تسجيل الخروج</button>
+      </div>
+    </aside>
+
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- المحتوى الرئيسي -->
+    <div class="main">
+      <header class="topbar">
+        <button class="icon-btn" id="sidebar-toggle" aria-label="فتح القائمة">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/></svg>
+        </button>
+        <h1 class="page-title" id="page-title">الرئيسية</h1>
+        <div class="topbar-date" id="topbar-date"></div>
+      </header>
+
+      <div class="content">
+
+        <!-- الرئيسية / الداشبورد -->
+        <section class="page is-active" id="page-dashboard" data-page="dashboard">
+          <div id="admin-dashboard">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-label">عدد الطلاب</span>
+                <span class="stat-value" id="stat-students">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">عدد المعلمين</span>
+                <span class="stat-value" id="stat-teachers">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">عدد الحصص</span>
+                <span class="stat-value" id="stat-classes">0</span>
+              </div>
+              <div class="stat-card stat-card-accent">
+                <span class="stat-label">الحضور النهارده</span>
+                <span class="stat-value" id="stat-attendance-today">—</span>
+              </div>
+            </div>
+
+            <div class="dash-grid">
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>حصص اليوم</h2>
+                </div>
+                <ul class="today-list" id="today-classes-list">
+                  <li class="empty-row">مفيش حصص مسجّلة النهارده</li>
+                </ul>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>أقرب إجازة</h2>
+                </div>
+                <div id="next-holiday" class="next-holiday">
+                  <p class="empty-row">مفيش إجازات مسجّلة</p>
+                </div>
+              </div>
+
+              <div class="panel panel-wide">
+                <div class="panel-head">
+                  <h2>استمارات محتاجة مراجعة</h2>
+                  <button class="link-btn" data-goto="registrations">عرض الكل</button>
+                </div>
+                <ul class="today-list" id="pending-regs-list">
+                  <li class="empty-row">مفيش استمارات جديدة</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div id="teacher-dashboard" hidden>
+            <div class="panel">
+              <div class="panel-head">
+                <h2>أهلاً بك يا <span id="teacher-welcome-name">معلم</span></h2>
+              </div>
+              <div class="teacher-quick-stats">
+                <div class="quick-stat">
+                  <span class="quick-stat-label">حصصي</span>
+                  <span class="quick-stat-value" id="teacher-classes-count">0</span>
+                </div>
+                <div class="quick-stat">
+                  <span class="quick-stat-label">عدد الطلاب</span>
+                  <span class="quick-stat-value" id="teacher-students-count">0</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h2>حصصي</h2>
+              </div>
+              <ul class="teacher-classes-list" id="teacher-classes-list">
+                <li class="empty-row">لا توجد حصص مسجلة</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- الطلاب -->
+        <section class="page admin-only" id="page-students" data-page="students">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>إضافة طالب جديد</h2>
+            </div>
+            <form id="student-form" class="grid-form">
+              <input type="text" name="name" placeholder="اسم الطالب" required>
+              <select name="classId" id="student-class-select" required>
+                <option value="">اختر المجموعة</option>
+              </select>
+              <input type="tel" name="guardianPhone" placeholder="رقم ولي الأمر" required>
+              <input type="number" name="monthlyFee" placeholder="الشهرية (جنيه)" min="0" required>
+              <button type="submit" class="btn btn-primary">إضافة الطالب</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>كل الطلاب</h2>
+              <input type="search" id="students-search" class="search-input" placeholder="دوّر باسم الطالب...">
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الاسم</th>
+                    <th>المجموعة</th>
+                    <th>رقم ولي الأمر</th>
+                    <th>الشهرية</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="students-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="students-empty" hidden>لسه مفيش طلاب مسجّلين</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- صفحة الطالب الفردية -->
+        <section class="page" id="page-student-profile" data-page="student-profile">
+          <div class="panel">
+            <button class="btn btn-outline" id="back-to-students">&larr; العودة</button>
+            <div class="student-profile-header" id="student-profile-header">
+              <!-- سيتم ملأ هذا ديناميكياً -->
+            </div>
+          </div>
+
+          <div class="profile-grid">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>معلومات شخصية</h3>
+              </div>
+              <div class="info-block" id="student-info-block">
+                <!-- سيتم ملأ هذا ديناميكياً -->
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h3>حالة الحضور</h3>
+              </div>
+              <div class="attendance-summary" id="student-attendance-summary">
+                <!-- سيتم ملأ هذا ديناميكياً -->
+              </div>
+            </div>
+
+            <div class="panel panel-wide">
+              <div class="panel-head">
+                <h3>سجل الحضور والغياب</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>التاريخ</th>
+                      <th>الحصة</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody id="student-attendance-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- المعلمين -->
+        <section class="page admin-only" id="page-teachers" data-page="teachers">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>إضافة معلم جديد</h2>
+            </div>
+            <form id="teacher-form" class="grid-form">
+              <input type="text" name="name" placeholder="اسم المعلم" required>
+              <input type="text" name="subject" placeholder="المادة" required>
+              <input type="tel" name="phone" placeholder="رقم الموبايل" required>
+              <input type="email" name="email" placeholder="البريد الإلكتروني" required>
+              <input type="password" name="password" placeholder="كلمة المرور" required>
+              <button type="submit" class="btn btn-primary">إضافة المعلم</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>كل المعلمين</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الاسم</th>
+                    <th>المادة</th>
+                    <th>البريد</th>
+                    <th>رقم الموبايل</th>
+                    <th>عدد المجموعات</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="teachers-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="teachers-empty" hidden>لسه مفيش معلمين مسجّلين</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- الحصص -->
+        <section class="page admin-only" id="page-classes" data-page="classes">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>إضافة مجموعة / حصة</h2>
+            </div>
+            <form id="class-form" class="grid-form class-form">
+              <input type="text" name="name" placeholder="اسم المجموعة (مثلاً: الأول إعدادي)" required>
+              <select name="teacherId" id="class-teacher-select" required>
+                <option value="">اختر المعلم</option>
+              </select>
+              <input type="time" name="time" required>
+              <div class="days-picker-field">
+                <span class="field-label">أيام الحصة</span>
+                <div class="days-picker" id="days-picker">
+                  <label><input type="checkbox" name="days" value="السبت"><span>السبت</span></label>
+                  <label><input type="checkbox" name="days" value="الأحد"><span>الأحد</span></label>
+                  <label><input type="checkbox" name="days" value="الإثنين"><span>الإثنين</span></label>
+                  <label><input type="checkbox" name="days" value="الثلاثاء"><span>الثلاثاء</span></label>
+                  <label><input type="checkbox" name="days" value="الأربعاء"><span>الأربعاء</span></label>
+                  <label><input type="checkbox" name="days" value="الخميس"><span>الخميس</span></label>
+                  <label><input type="checkbox" name="days" value="الجمعة"><span>الجمعة</span></label>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary">إضافة المجموعة</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>كل المجموعات</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>المجموعة</th>
+                    <th>المعلم</th>
+                    <th>الأيام</th>
+                    <th>الميعاد</th>
+                    <th>عدد الطلاب</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="classes-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="classes-empty" hidden>لسه مفيش مجموعات مضافة</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- الحضور والغياب -->
+        <section class="page" id="page-attendance" data-page="attendance">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>تسجيل الحضور</h2>
+            </div>
+            <div class="attendance-controls">
+              <select id="attendance-class-select">
+                <option value="">اختر المجموعة</option>
+              </select>
+              <input type="date" id="attendance-date">
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الطالب</th>
+                    <th>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody id="attendance-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="attendance-empty">اختر مجموعة وتاريخ عشان تسجّل الحضور</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="save-attendance-btn" hidden>حفظ الحضور</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>إحصائيات الحضور</h2>
+            </div>
+            <div id="attendance-stats" class="attendance-stats">
+              <!-- سيتم ملأ هذا ديناميكياً -->
+            </div>
+          </div>
+        </section>
+
+        <!-- الإجازات -->
+        <section class="page admin-only" id="page-holidays" data-page="holidays">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>إضافة إجازة</h2>
+            </div>
+            <form id="holiday-form" class="grid-form">
+              <input type="text" name="title" placeholder="مناسبة الإجازة" required>
+              <input type="date" name="date" required>
+              <button type="submit" class="btn btn-primary">إضافة</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>كل الإجازات</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>المناسبة</th>
+                    <th>التاريخ</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="holidays-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="holidays-empty" hidden>لسه مفيش إجازات مسجّلة</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- الشهريات -->
+        <section class="page admin-only" id="page-fees" data-page="fees">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>متابعة شهريات — <span id="fees-month-label"></span></h2>
+              <input type="month" id="fees-month-picker">
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الطالب</th>
+                    <th>المجموعة</th>
+                    <th>الشهرية</th>
+                    <th>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody id="fees-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="fees-empty" hidden>لسه مفيش طلاب مسجّلين</p>
+            </div>
+            <div class="fees-summary" id="fees-summary"></div>
+          </div>
+        </section>
+
+        <!-- مصروفات السنتر -->
+        <section class="page admin-only" id="page-expenses" data-page="expenses">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>إضافة مصروف</h2>
+            </div>
+            <form id="expense-form" class="grid-form">
+              <input type="text" name="title" placeholder="بيان المصروف" required>
+              <input type="number" name="amount" placeholder="المبلغ (جنيه)" min="0" required>
+              <input type="date" name="date" required>
+              <button type="submit" class="btn btn-primary">إضافة</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>كل المصروفات</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>البيان</th>
+                    <th>المبلغ</th>
+                    <th>التاريخ</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="expenses-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="expenses-empty" hidden>لسه مفيش مصروفات مسجّلة</p>
+            </div>
+            <div class="fees-summary" id="expenses-summary"></div>
+          </div>
+        </section>
+
+        <!-- استمارات الطلاب الجدد -->
+        <section class="page admin-only" id="page-registrations" data-page="registrations">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>استمارة تسجيل طالب جديد</h2>
+            </div>
+            <p class="panel-note">النموذج ده لواجهة استقبال طلبات الالتحاق — لما حد يملاه، بيظهر هنا تحت في قائمة "بانتظار المراجعة" لحد ما توافق عليه ويتحول لطالب فعلي.</p>
+            <form id="registration-form" class="grid-form">
+              <input type="text" name="studentName" placeholder="اسم الطالب" required>
+              <select name="classId" id="registration-class-select" required>
+                <option value="">اختر المجموعة</option>
+              </select>
+              <input type="text" name="guardianName" placeholder="اسم ولي الأمر" required>
+              <input type="tel" name="guardianPhone" placeholder="رقم ولي الأمر" required>
+              <button type="submit" class="btn btn-primary">إرسال الاستمارة</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>بانتظار المراجعة</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>اسم الطالب</th>
+                    <th>المجموعة</th>
+                    <th>ولي الأمر</th>
+                    <th>الموبايل</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="registrations-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="registrations-empty" hidden>مفيش استمارات جديدة دلوقتي</p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="script.js"></script>
+</body>
+</html>
