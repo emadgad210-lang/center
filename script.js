@@ -2,10 +2,9 @@
 const AUTH_KEY = 'sabbora-auth';
 const STORAGE_KEY = 'sabbora-dashboard-data';
 
-// بيانات تجريبية للمستخدمين
+// بيانات تجريبية لحساب الأدمن فقط (المعلمون يسجلون دخول ببريدهم وكلمة مرورهم الحقيقية من صفحة "المعلمين")
 const DEMO_USERS = {
-  'admin': { password: 'password123', role: 'admin', name: 'مسؤول النظام' },
-  'teacher@school.com': { password: 'teacher123', role: 'teacher', name: 'أحمد محمود', teacherId: 'teacher-1' }
+  'admin': { password: 'password123', role: 'admin', name: 'مسؤول النظام' }
 };
 
 let currentUser = null;
@@ -15,7 +14,11 @@ let data = loadData();
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
-    try { return JSON.parse(raw); } catch (e) { }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed.exams) parsed.exams = [];
+      return parsed;
+    } catch (e) { }
   }
   return {
     students: [],
@@ -26,7 +29,8 @@ function loadData() {
     attendance: {},
     payments: {},
     registrations: [],
-    notifications: []
+    notifications: [],
+    exams: []
   };
 }
 
@@ -45,21 +49,56 @@ loginForm.addEventListener('submit', (e) => {
   const password = document.getElementById('login-password').value;
   const role = document.getElementById('login-role').value;
 
-  // التحقق من بيانات المستخدم
-  if (DEMO_USERS[email] && DEMO_USERS[email].password === password && DEMO_USERS[email].role === role) {
-    currentUser = {
-      email,
-      ...DEMO_USERS[email],
-      loginTime: new Date().toLocaleString('ar-EG')
-    };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
-    loginPage.hidden = true;
-    dashboardWrapper.hidden = false;
-    initializeDashboard();
-    showToast('مرحباً يا ' + currentUser.name);
-  } else {
-    showToast('❌ بيانات الدخول غير صحيحة');
+  if (role === 'admin') {
+    // حساب الأدمن التجريبي الثابت
+    if (DEMO_USERS[email] && DEMO_USERS[email].password === password && DEMO_USERS[email].role === 'admin') {
+      currentUser = {
+        email,
+        ...DEMO_USERS[email],
+        loginTime: new Date().toLocaleString('ar-EG')
+      };
+      localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
+      loginPage.hidden = true;
+      dashboardWrapper.hidden = false;
+      initializeDashboard();
+      showToast('مرحباً يا ' + currentUser.name);
+      return;
+    }
+  } else if (role === 'teacher') {
+    // التحقق من بيانات المعلم الحقيقية المسجّلة في صفحة "المعلمين"
+    const teacher = data.teachers.find(t => t.email === email && t.password === password);
+    if (teacher) {
+      currentUser = {
+        email,
+        role: 'teacher',
+        name: teacher.name,
+        teacherId: teacher.id,
+        loginTime: new Date().toLocaleString('ar-EG')
+      };
+      localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
+      loginPage.hidden = true;
+      dashboardWrapper.hidden = false;
+      initializeDashboard();
+      showToast('مرحباً يا ' + currentUser.name);
+      return;
+    }
   }
+
+  showToast('❌ بيانات الدخول غير صحيحة');
+});
+
+// ========== إظهار/إخفاء كلمة المرور ==========
+const passwordToggleBtn = document.getElementById('password-toggle-btn');
+const passwordInput = document.getElementById('login-password');
+const eyeIcon = document.getElementById('eye-icon');
+const eyeOffIcon = document.getElementById('eye-off-icon');
+
+passwordToggleBtn.addEventListener('click', () => {
+  const isHidden = passwordInput.type === 'password';
+  passwordInput.type = isHidden ? 'text' : 'password';
+  eyeIcon.hidden = isHidden;
+  eyeOffIcon.hidden = !isHidden;
+  passwordToggleBtn.setAttribute('aria-label', isHidden ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور');
 });
 
 // ========== تسجيل الخروج ==========
@@ -107,6 +146,8 @@ const pageTitles = {
   teachers: 'المعلمين',
   classes: 'الحصص',
   attendance: 'الحضور والغياب',
+  exams: 'الاختبارات والتقييمات',
+  'exam-scores': 'رصد الدرجات',
   holidays: 'الإجازات',
   fees: 'الشهريات',
   expenses: 'مصروفات السنتر',
@@ -146,10 +187,135 @@ sidebarToggle.addEventListener('click', () => {
 
 sidebarOverlay.addEventListener('click', closeSidebar);
 
+// ========== البحث العام ==========
+const globalSearchInput = document.getElementById('global-search-input');
+const globalSearchResults = document.getElementById('global-search-results');
+
+function highlightTeacherRow(teacherId) {
+  goToPage('teachers');
+  setTimeout(() => {
+    const row = document.querySelector(`[data-teacher-row="${teacherId}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('table-row-highlight');
+      setTimeout(() => row.classList.remove('table-row-highlight'), 2000);
+    }
+  }, 50);
+}
+
+function renderGlobalSearch(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    globalSearchResults.hidden = true;
+    globalSearchResults.innerHTML = '';
+    return;
+  }
+
+  const isAdmin = currentUser.role === 'admin';
+  let matchedStudents = data.students.filter(s => s.name.toLowerCase().includes(q));
+  let matchedTeachers = isAdmin ? data.teachers.filter(t => t.name.toLowerCase().includes(q)) : [];
+
+  if (!isAdmin) {
+    const teacherClasses = data.classes.filter(c => c.teacherId === currentUser.teacherId);
+    matchedStudents = matchedStudents.filter(s => teacherClasses.some(c => c.id === s.classId));
+  }
+
+  matchedStudents = matchedStudents.slice(0, 6);
+  matchedTeachers = matchedTeachers.slice(0, 6);
+
+  if (matchedStudents.length === 0 && matchedTeachers.length === 0) {
+    globalSearchResults.innerHTML = `<div class="search-result-empty">مفيش نتائج مطابقة</div>`;
+    globalSearchResults.hidden = false;
+    return;
+  }
+
+  let html = '';
+
+  if (matchedStudents.length > 0) {
+    html += `<div class="search-result-group-label">الطلاب</div>`;
+    html += matchedStudents.map(s => {
+      const cls = classById(s.classId);
+      return `
+        <div class="search-result-item" onclick="selectSearchResult('student', '${s.id}')">
+          <span class="search-result-name">${s.name}</span>
+          <span class="search-result-meta">${cls?.name || 'بدون مجموعة'}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (matchedTeachers.length > 0) {
+    html += `<div class="search-result-group-label">المعلمين</div>`;
+    html += matchedTeachers.map(t => `
+      <div class="search-result-item" onclick="selectSearchResult('teacher', '${t.id}')">
+        <span class="search-result-name">${t.name}</span>
+        <span class="search-result-meta">${t.subject || ''}</span>
+      </div>
+    `).join('');
+  }
+
+  globalSearchResults.innerHTML = html;
+  globalSearchResults.hidden = false;
+}
+
+function selectSearchResult(type, id) {
+  globalSearchInput.value = '';
+  globalSearchResults.hidden = true;
+  globalSearchResults.innerHTML = '';
+
+  if (type === 'student') {
+    viewStudentProfile(id);
+  } else if (type === 'teacher') {
+    highlightTeacherRow(id);
+  }
+}
+
+globalSearchInput.addEventListener('input', (e) => renderGlobalSearch(e.target.value));
+
+globalSearchInput.addEventListener('focus', (e) => {
+  if (e.target.value.trim()) renderGlobalSearch(e.target.value);
+});
+
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('global-search-wrap').contains(e.target)) {
+    globalSearchResults.hidden = true;
+  }
+});
+
+// ========== تبديل الوضع الداكن/الفاتح ==========
+const THEME_KEY = 'sabbora-theme';
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const themeIconMoon = document.getElementById('theme-icon-moon');
+const themeIconSun = document.getElementById('theme-icon-sun');
+
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    themeIconMoon.hidden = true;
+    themeIconSun.hidden = false;
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    themeIconMoon.hidden = false;
+    themeIconSun.hidden = true;
+  }
+}
+
+const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
+applyTheme(savedTheme);
+
+themeToggleBtn.addEventListener('click', () => {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const newTheme = isLight ? 'dark' : 'light';
+  applyTheme(newTheme);
+  localStorage.setItem(THEME_KEY, newTheme);
+});
+
 // ========== التاريخ والوقت ==========
 const topbarDate = document.getElementById('topbar-date');
 const todayISO = new Date().toISOString().slice(0, 10);
-topbarDate.textContent = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const gregorianDate = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const hijriDate = new Date().toLocaleDateString('ar-EG-u-ca-islamic-umalqura', { year: 'numeric', month: 'long', day: 'numeric' });
+topbarDate.innerHTML = `${gregorianDate}<span class="topbar-date-sep">|</span>${hijriDate} هـ`;
 
 // ========== أدوات مساعدة ==========
 function showToast(message) {
@@ -175,110 +341,13 @@ function fillSelect(select, items, placeholder) {
   if (items.some((i) => i.id === current)) select.value = current;
 }
 
-// ========== أدوات روابط واتساب (wa.me) ==========
-// نظرًا لأن هذا تطبيق يعمل بالكامل من المتصفح بدون خادم، لا يمكن استخدام
-// Twilio أو WhatsApp Business API مباشرة (تحتاج مفاتيح سرية يجب أن تبقى على خادم).
-// البديل العملي الذي يعمل فورًا وبدون أي اشتراك: رابط wa.me الذي يفتح واتساب
-// (ويب أو تطبيق) مع رسالة جاهزة، ويحتاج المستخدم فقط لضغط "إرسال".
-function toWhatsAppNumber(phone) {
-  let digits = (phone || '').replace(/[^\d]/g, '');
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  // رقم محلي مصري بصيغة 01xxxxxxxxx (11 رقم) → نضيف كود الدولة 20
-  if (digits.startsWith('0') && digits.length === 11) digits = '20' + digits.slice(1);
-  return digits;
-}
-
-function buildWhatsAppLink(phone, message) {
-  const number = toWhatsAppNumber(phone);
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
-}
-
-// ========== نظام إرسال التنبيهات عبر WhatsApp ==========
-class WhatsAppNotificationService {
-  static async sendAbsenceNotification(studentId, className, guardianPhone) {
-    const student = studentById(studentId);
-    if (!student) return;
-
-    const message = `
-🔔 *تنبيه الغياب* 🔔
-
-السلام عليكم ورحمة الله وبركاته،
-
-تنبيه من مركز ${getSchoolName()}: 
-الطالب/ة *${student.name}* تغيب عن حصة *${className}*
-
-📅 التاريخ: ${new Date().toLocaleDateString('ar-EG')}
-⏰ الوقت: ${new Date().toLocaleTimeString('ar-EG')}
-
-يرجى متابعة الطالب والتواصل مع الإدارة للمزيد من التفاصيل.
-
-شكراً لتفهمك 🙏
-    `.trim();
-
-    if (!guardianPhone) {
-      return { success: false, error: 'no-phone', studentName: student.name };
-    }
-
-    const link = buildWhatsAppLink(guardianPhone, message);
-
-    // تخزين تسجيل للإخطار
-    data.notifications.push({
-      id: uid(),
-      type: 'absence',
-      studentId,
-      guardianPhone,
-      message,
-      whatsappLink: link,
-      sentAt: new Date().toISOString(),
-      status: 'link-ready'
-    });
-
-    saveData();
-    return { success: true, link, studentName: student.name };
+// ========== إبلاغ ولي الأمر (اتصال مباشر) ==========
+function callGuardian(phone, studentName) {
+  if (!phone) {
+    showToast('❌ لا يوجد رقم ولي أمر مسجّل');
+    return;
   }
-
-  static async sendPaymentReminder(studentId, guardianPhone, amount) {
-    const student = studentById(studentId);
-    if (!student) return;
-
-    const message = `
-💰 *تذكير الشهرية* 💰
-
-السلام عليكم ورحمة الله وبركاته،
-
-تذكير بسداد الشهرية الخاصة بـ *${student.name}*
-
-💵 المبلغ المستحق: ${amount} جنيه
-📅 آخر موعد للسداد: ${getNextPaymentDeadline()}
-
-يرجى التواصل مع الإدارة للمزيد من التفاصيل.
-
-شكراً لتفهمك 🙏
-    `.trim();
-
-    console.log('📱 إرسال رسالة WhatsApp:', { to: guardianPhone, message });
-
-    data.notifications.push({
-      id: uid(),
-      type: 'payment',
-      studentId,
-      guardianPhone,
-      message,
-      sentAt: new Date().toISOString(),
-      status: 'sent'
-    });
-
-    saveData();
-  }
-}
-
-function getSchoolName() {
-  return 'مركز الدروس';
-}
-
-function getNextPaymentDeadline() {
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth() + 1, 0).toLocaleDateString('ar-EG');
+  window.location.href = `tel:${phone}`;
 }
 
 // ========== الرئيسية (الداشبورد) ==========
@@ -392,7 +461,13 @@ function renderStudents() {
         <td><strong>${s.name}</strong></td>
         <td>${cls?.name || 'غير محدد'}</td>
         <td>${s.guardianPhone}</td>
-        <td>${s.monthlyFee} ج</td>
+        <td>
+          <div class="fee-edit">
+            <input type="number" min="0" step="0.5" value="${s.monthlyFee}" class="fee-input"
+              onchange="updateStudentFee('${s.id}', this.value)">
+            <span>ج</span>
+          </div>
+        </td>
         <td>
           <button class="icon-btn" onclick="viewStudentProfile('${s.id}')" title="عرض الملف">👁️</button>
           <button class="icon-btn" onclick="deleteStudent('${s.id}')" title="حذف">🗑️</button>
@@ -408,6 +483,17 @@ function renderStudents() {
     data.classes.map(c => ({ id: c.id, label: c.name })),
     'اختر المجموعة'
   );
+}
+
+function updateStudentFee(id, value) {
+  const student = studentById(id);
+  if (!student) return;
+
+  const fee = parseFloat(value);
+  student.monthlyFee = isNaN(fee) || fee < 0 ? 0 : fee;
+  saveData();
+  renderFees();
+  showToast('✅ تم تحديث الشهرية');
 }
 
 function deleteStudent(id) {
@@ -449,6 +535,7 @@ function viewStudentProfile(studentId) {
       <span class="info-label">تاريخ التسجيل:</span>
       <span class="info-value">${new Date(student.enrollDate).toLocaleDateString('ar-EG')}</span>
     </div>
+    <button type="button" class="btn btn-outline btn-block" onclick="callGuardian('${student.guardianPhone}', '${student.name}')">📞 إبلاغ ولي الأمر</button>
   `;
 
   // إحصائيات الحضور
@@ -499,6 +586,28 @@ function viewStudentProfile(studentId) {
     </tr>
   `).join('');
 
+  // الاختبارات والتقييمات
+  const examsTable = document.getElementById('student-exams-table');
+  const examsEmpty = document.getElementById('student-exams-empty');
+  const studentExams = data.exams
+    .filter(ex => ex.scores && ex.scores[studentId] !== undefined)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  examsTable.innerHTML = studentExams.map(ex => {
+    const score = ex.scores[studentId];
+    const pct = ((score / ex.maxScore) * 100).toFixed(0);
+    return `
+      <tr>
+        <td>${ex.title}</td>
+        <td>${new Date(ex.date).toLocaleDateString('ar-EG')}</td>
+        <td>${score} / ${ex.maxScore}</td>
+        <td>${pct}%</td>
+      </tr>
+    `;
+  }).join('');
+
+  examsEmpty.hidden = studentExams.length > 0;
+
   // زر العودة
   document.getElementById('back-to-students').onclick = () => goToPage('students');
 }
@@ -533,7 +642,7 @@ function renderTeachers() {
   tbody.innerHTML = data.teachers.map(t => {
     const classCount = data.classes.filter(c => c.teacherId === t.id).length;
     return `
-      <tr>
+      <tr data-teacher-row="${t.id}">
         <td><strong>${t.name}</strong></td>
         <td>${t.subject}</td>
         <td>${t.email}</td>
@@ -665,10 +774,13 @@ function renderAttendance() {
       <tr>
         <td>${s.name}</td>
         <td>
-          <select data-student-id="${s.id}" onchange="updateAttendance('${s.id}', this.value, '${s.guardianPhone}')">
+          <select onchange="updateAttendance('${s.id}', this.value, '${s.guardianPhone}')">
             <option value="present" ${status === 'present' ? 'selected' : ''}>✓ حاضر</option>
             <option value="absent" ${status === 'absent' ? 'selected' : ''}>✗ غائب</option>
           </select>
+        </td>
+        <td>
+          <button type="button" class="btn btn-outline btn-sm" onclick="callGuardian('${s.guardianPhone}', '${s.name}')">📞 إبلاغ ولي الأمر</button>
         </td>
       </tr>
     `;
@@ -687,11 +799,6 @@ function updateAttendance(studentId, status, guardianPhone) {
 }
 
 document.getElementById('save-attendance-btn').addEventListener('click', () => {
-  const key = `${currentAttendanceDate}_${currentAttendanceClass}`;
-  if (!data.attendance[key]) data.attendance[key] = {};
-  document.querySelectorAll('#attendance-table-body select[data-student-id]').forEach(sel => {
-    data.attendance[key][sel.dataset.studentId] = sel.value;
-  });
   saveData();
   showToast('✅ تم حفظ الحضور');
   renderAttendanceStats();
@@ -718,6 +825,140 @@ function renderAttendanceStats() {
     </div>
   `;
 }
+
+// ========== الاختبارات والتقييمات ==========
+const examForm = document.getElementById('exam-form');
+examForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const exam = {
+    id: uid(),
+    title: examForm.title.value,
+    classId: examForm.classId.value,
+    date: examForm.date.value,
+    maxScore: Number(examForm.maxScore.value),
+    scores: {}
+  };
+
+  data.exams.push(exam);
+  saveData();
+  examForm.reset();
+  examForm.maxScore.value = 10;
+  renderExams();
+  showToast('✅ تم إضافة الاختبار');
+});
+
+function renderExams() {
+  const tbody = document.getElementById('exams-table-body');
+  const empty = document.getElementById('exams-empty');
+
+  const sorted = [...data.exams].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  tbody.innerHTML = sorted.map(ex => {
+    const cls = classById(ex.classId);
+    const scoreValues = Object.values(ex.scores || {});
+    const avg = scoreValues.length > 0
+      ? (scoreValues.reduce((sum, v) => sum + Number(v), 0) / scoreValues.length).toFixed(1)
+      : '—';
+    return `
+      <tr>
+        <td><strong>${ex.title}</strong></td>
+        <td>${cls?.name || 'غير محدد'}</td>
+        <td>${new Date(ex.date).toLocaleDateString('ar-EG')}</td>
+        <td>${ex.maxScore}</td>
+        <td>${avg}</td>
+        <td>
+          <button class="icon-btn" onclick="openExamScores('${ex.id}')" title="رصد الدرجات">📝</button>
+          <button class="icon-btn" onclick="deleteExam('${ex.id}')" title="حذف">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  empty.hidden = sorted.length > 0;
+
+  fillSelect(
+    document.getElementById('exam-class-select'),
+    data.classes.map(c => ({ id: c.id, label: c.name })),
+    'اختر المجموعة'
+  );
+}
+
+function deleteExam(id) {
+  if (confirm('هل أنت متأكد؟')) {
+    data.exams = data.exams.filter(ex => ex.id !== id);
+    saveData();
+    renderExams();
+    showToast('✅ تم حذف الاختبار');
+  }
+}
+
+let currentExamId = null;
+let changedExamScores = {};
+
+function openExamScores(examId) {
+  const exam = data.exams.find(ex => ex.id === examId);
+  if (!exam) return;
+
+  currentExamId = examId;
+  changedExamScores = {};
+  goToPage('exam-scores');
+  renderExamScores();
+}
+
+function renderExamScores() {
+  const exam = data.exams.find(ex => ex.id === currentExamId);
+  if (!exam) return;
+
+  const cls = classById(exam.classId);
+  const header = document.getElementById('exam-scores-header');
+  header.innerHTML = `
+    <h2>${exam.title}</h2>
+    <p class="profile-subtitle">المجموعة: ${cls?.name || 'غير محدد'} — الدرجة الكاملة: ${exam.maxScore}</p>
+  `;
+
+  const tbody = document.getElementById('exam-scores-table-body');
+  const empty = document.getElementById('exam-scores-empty');
+  const students = data.students.filter(s => s.classId === exam.classId);
+
+  tbody.innerHTML = students.map(s => {
+    const score = exam.scores?.[s.id] ?? '';
+    return `
+      <tr>
+        <td>${s.name}</td>
+        <td>
+          <input type="number" min="0" max="${exam.maxScore}" step="0.5" value="${score}"
+            onchange="updateExamScore('${s.id}', this.value)" placeholder="الدرجة">
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  empty.hidden = students.length > 0;
+  document.getElementById('back-to-exams').onclick = () => goToPage('exams');
+}
+
+function updateExamScore(studentId, value) {
+  changedExamScores[studentId] = value;
+}
+
+document.getElementById('save-exam-scores-btn').addEventListener('click', () => {
+  const exam = data.exams.find(ex => ex.id === currentExamId);
+  if (!exam) return;
+
+  if (!exam.scores) exam.scores = {};
+  Object.entries(changedExamScores).forEach(([studentId, value]) => {
+    if (value === '') {
+      delete exam.scores[studentId];
+    } else {
+      exam.scores[studentId] = Number(value);
+    }
+  });
+
+  saveData();
+  changedExamScores = {};
+  renderExams();
+  showToast('✅ تم حفظ الدرجات');
+});
 
 // ========== الإجازات ==========
 const holidayForm = document.getElementById('holiday-form');
@@ -808,6 +1049,11 @@ function renderFees() {
     .filter(s => data.payments[`${month}_${s.id}`])
     .reduce((sum, s) => sum + s.monthlyFee, 0);
 
+  const monthExpenses = data.expenses
+    .filter(e => e.date && e.date.slice(0, 7) === month)
+    .reduce((sum, e) => sum + e.amount, 0);
+  const netProfit = paidAmount - monthExpenses;
+
   document.getElementById('fees-summary').innerHTML = `
     <div class="summary-grid">
       <div class="summary-item">
@@ -821,6 +1067,12 @@ function renderFees() {
       </div>
       <div class="summary-item">
         <strong>نسبة التحصيل:</strong> ${total > 0 ? ((paid / total) * 100).toFixed(1) : 0}%
+      </div>
+      <div class="summary-item">
+        <strong>مصروفات الشهر:</strong> ${monthExpenses} ج
+      </div>
+      <div class="summary-item ${netProfit >= 0 ? 'profit-positive' : 'profit-negative'}">
+        <strong>صافي الربح:</strong> ${netProfit} ج
       </div>
     </div>
   `;
@@ -915,22 +1167,26 @@ function renderRegistrations() {
   const tbody = document.getElementById('registrations-table-body');
   const empty = document.getElementById('registrations-empty');
 
-  tbody.innerHTML = data.registrations
-    .filter(r => !r.approved)
-    .map(r => `
+  const pending = data.registrations.filter(r => !r.approved);
+
+  tbody.innerHTML = pending
+    .map(r => {
+      const cls = classById(r.classId);
+      return `
       <tr>
         <td>${r.studentName}</td>
-        <td>${classById(r.classId)?.name || 'غير محدد'}</td>
+        <td>${cls?.name || 'غير محدد'}</td>
         <td>${r.guardianName}</td>
         <td>${r.guardianPhone}</td>
         <td>
-          <button class="btn-action btn-approve" onclick="approveRegistration('${r.id}')" title="قبول الاستمارة">✓ قبول</button>
-          <button class="btn-action btn-reject" onclick="deleteRegistration('${r.id}')" title="رفض الاستمارة">✗ رفض</button>
+          <button class="icon-btn icon-btn-approve" onclick="approveRegistration('${r.id}')" title="قبول">✓</button>
+          <button class="icon-btn icon-btn-reject" onclick="deleteRegistration('${r.id}')" title="رفض">✗</button>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
-  empty.hidden = data.registrations.some(r => !r.approved);
+  empty.hidden = pending.length > 0;
 
   fillSelect(
     document.getElementById('registration-class-select'),
@@ -946,7 +1202,7 @@ function approveRegistration(regId) {
   data.students.push({
     id: uid(),
     name: reg.studentName,
-    classId: reg.classId,
+    classId: reg.classId || '',
     guardianPhone: reg.guardianPhone,
     monthlyFee: 0, // سيتم تحديده لاحقاً
     enrollDate: new Date().toISOString()
@@ -956,7 +1212,7 @@ function approveRegistration(regId) {
   saveData();
   renderRegistrations();
   renderStudents();
-  showToast('✅ تم قبول الاستمارة وإضافة الطالب للمجموعة');
+  showToast('✅ تم قبول الاستمارة');
 }
 
 function deleteRegistration(regId) {
@@ -979,6 +1235,7 @@ function renderAll() {
   renderClasses();
   renderAttendance();
   renderAttendanceStats();
+  renderExams();
   renderHolidays();
   renderFees();
   renderExpenses();
@@ -1005,6 +1262,7 @@ document.getElementById('attendance-date').valueAsDate = new Date();
 document.getElementById('fees-month-picker').value = new Date().toISOString().slice(0, 7);
 document.getElementById('expense-form').date.valueAsDate = new Date();
 document.getElementById('holiday-form').date.valueAsDate = new Date();
+document.getElementById('exam-form').date.valueAsDate = new Date();
 
 // إصلاح: ضبط التاريخ الحالي في الحقل لا يطلق حدث "change" تلقائياً،
 // فكانت صفحة الحضور تظل تعتقد أنه لا يوجد تاريخ مُختار ولا تعرض أي طالب
