@@ -35,7 +35,19 @@
           </div>
           <div class="form-group">
             <label for="login-password">كلمة المرور</label>
-            <input type="password" id="login-password" name="password" placeholder="أدخل كلمة المرور" required>
+            <div class="password-field">
+              <input type="password" id="login-password" name="password" placeholder="أدخل كلمة المرور" required>
+              <button type="button" class="password-toggle-btn" id="password-toggle-btn" aria-label="إظهار كلمة المرور">
+                <svg id="eye-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg id="eye-off-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden>
+                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.4 20.4 0 0 1 4.22-5.06M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a20.3 20.3 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="form-group">
             <label for="login-role">تسجيل كـ</label>
@@ -51,7 +63,7 @@
         <div class="demo-credentials">
           <p><strong>🔑 بيانات تجريبية:</strong></p>
           <p>أدمن: admin / password123</p>
-          <p>معلم: teacher@school.com / teacher123</p>
+          <p>معلم: سجّل دخولك ببريدك وكلمة المرور اللي أضافهم الأدمن لك في صفحة "المعلمين"</p>
         </div>
       </div>
     </div>
@@ -97,6 +109,9 @@
         <button class="nav-item" data-page="attendance">
           <span class="nav-label">الحضور والغياب</span>
         </button>
+        <button class="nav-item" data-page="exams">
+          <span class="nav-label">الاختبارات والتقييمات</span>
+        </button>
         <button class="nav-item admin-only" data-page="holidays">
           <span class="nav-label">الإجازات</span>
         </button>
@@ -126,7 +141,20 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/></svg>
         </button>
         <h1 class="page-title" id="page-title">الرئيسية</h1>
+        <div class="global-search" id="global-search-wrap">
+          <input type="search" id="global-search-input" class="global-search-input" placeholder="دوّر عن طالب أو معلم...">
+          <div class="global-search-results" id="global-search-results" hidden></div>
+        </div>
         <div class="topbar-date" id="topbar-date"></div>
+        <button class="icon-btn" id="theme-toggle-btn" aria-label="تبديل الوضع الداكن/الفاتح" title="تبديل الوضع الداكن/الفاتح">
+          <svg id="theme-icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg id="theme-icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden>
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+        </button>
       </header>
 
       <div class="content">
@@ -297,6 +325,26 @@
                 </table>
               </div>
             </div>
+
+            <div class="panel panel-wide">
+              <div class="panel-head">
+                <h3>الاختبارات والتقييمات</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>الاختبار</th>
+                      <th>التاريخ</th>
+                      <th>الدرجة</th>
+                      <th>النسبة</th>
+                    </tr>
+                  </thead>
+                  <tbody id="student-exams-table"></tbody>
+                </table>
+                <p class="empty-row" id="student-exams-empty" hidden>لسه مفيش اختبارات مسجّلة للطالب ده</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -345,23 +393,20 @@
             <div class="panel-head">
               <h2>إضافة مجموعة / حصة</h2>
             </div>
-            <form id="class-form" class="grid-form class-form">
+            <form id="class-form" class="grid-form">
               <input type="text" name="name" placeholder="اسم المجموعة (مثلاً: الأول إعدادي)" required>
               <select name="teacherId" id="class-teacher-select" required>
                 <option value="">اختر المعلم</option>
               </select>
               <input type="time" name="time" required>
-              <div class="days-picker-field">
-                <span class="field-label">أيام الحصة</span>
-                <div class="days-picker" id="days-picker">
-                  <label><input type="checkbox" name="days" value="السبت"><span>السبت</span></label>
-                  <label><input type="checkbox" name="days" value="الأحد"><span>الأحد</span></label>
-                  <label><input type="checkbox" name="days" value="الإثنين"><span>الإثنين</span></label>
-                  <label><input type="checkbox" name="days" value="الثلاثاء"><span>الثلاثاء</span></label>
-                  <label><input type="checkbox" name="days" value="الأربعاء"><span>الأربعاء</span></label>
-                  <label><input type="checkbox" name="days" value="الخميس"><span>الخميس</span></label>
-                  <label><input type="checkbox" name="days" value="الجمعة"><span>الجمعة</span></label>
-                </div>
+              <div class="days-picker" id="days-picker">
+                <label><input type="checkbox" name="days" value="السبت"> السبت</label>
+                <label><input type="checkbox" name="days" value="الأحد"> الأحد</label>
+                <label><input type="checkbox" name="days" value="الإثنين"> الإثنين</label>
+                <label><input type="checkbox" name="days" value="الثلاثاء"> الثلاثاء</label>
+                <label><input type="checkbox" name="days" value="الأربعاء"> الأربعاء</label>
+                <label><input type="checkbox" name="days" value="الخميس"> الخميس</label>
+                <label><input type="checkbox" name="days" value="الجمعة"> الجمعة</label>
               </div>
               <button type="submit" class="btn btn-primary">إضافة المجموعة</button>
             </form>
@@ -408,6 +453,7 @@
                   <tr>
                     <th>الطالب</th>
                     <th>الحالة</th>
+                    <th>ولي الأمر</th>
                   </tr>
                 </thead>
                 <tbody id="attendance-table-body"></tbody>
@@ -424,6 +470,69 @@
             <div id="attendance-stats" class="attendance-stats">
               <!-- سيتم ملأ هذا ديناميكياً -->
             </div>
+          </div>
+        </section>
+
+        <!-- الاختبارات والتقييمات -->
+        <section class="page" id="page-exams" data-page="exams">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>إضافة اختبار جديد</h2>
+            </div>
+            <form id="exam-form" class="grid-form">
+              <input type="text" name="title" placeholder="اسم الاختبار" required>
+              <select id="exam-class-select" name="classId" required>
+                <option value="">اختر المجموعة</option>
+              </select>
+              <input type="date" name="date" required>
+              <input type="number" name="maxScore" placeholder="الدرجة الكاملة" min="1" value="10" required>
+              <button type="submit" class="btn btn-primary">إضافة</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>كل الاختبارات</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الاختبار</th>
+                    <th>المجموعة</th>
+                    <th>التاريخ</th>
+                    <th>الدرجة الكاملة</th>
+                    <th>متوسط الدرجات</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="exams-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="exams-empty" hidden>لسه مفيش اختبارات مسجّلة</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- رصد درجات اختبار -->
+        <section class="page" id="page-exam-scores" data-page="exam-scores">
+          <div class="panel">
+            <button class="btn btn-outline" id="back-to-exams">&larr; العودة</button>
+            <div class="panel-head" id="exam-scores-header">
+              <!-- سيتم ملأ هذا ديناميكياً -->
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الطالب</th>
+                    <th>الدرجة</th>
+                  </tr>
+                </thead>
+                <tbody id="exam-scores-table-body"></tbody>
+              </table>
+              <p class="empty-row" id="exam-scores-empty" hidden>لا يوجد طلاب في هذه المجموعة</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="save-exam-scores-btn">حفظ الدرجات</button>
           </div>
         </section>
 
@@ -530,7 +639,7 @@
             <p class="panel-note">النموذج ده لواجهة استقبال طلبات الالتحاق — لما حد يملاه، بيظهر هنا تحت في قائمة "بانتظار المراجعة" لحد ما توافق عليه ويتحول لطالب فعلي.</p>
             <form id="registration-form" class="grid-form">
               <input type="text" name="studentName" placeholder="اسم الطالب" required>
-              <select name="classId" id="registration-class-select" required>
+              <select id="registration-class-select" name="classId" required>
                 <option value="">اختر المجموعة</option>
               </select>
               <input type="text" name="guardianName" placeholder="اسم ولي الأمر" required>
