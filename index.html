@@ -121,6 +121,9 @@
           <span class="nav-label">استمارات طلاب جدد</span>
           <span class="nav-badge" id="reg-badge" hidden>0</span>
         </button>
+        <button class="nav-item admin-only" data-page="backup">
+          <span class="nav-label">النسخ الاحتياطية</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -271,7 +274,7 @@
                     <th>المجموعة</th>
                     <th>رقم ولي الأمر</th>
                     <th>الشهرية</th>
-                    <th></th>
+                    <th style="width:110px"></th>
                   </tr>
                 </thead>
                 <tbody id="students-table-body"></tbody>
@@ -378,7 +381,7 @@
                     <th>البريد</th>
                     <th>رقم الموبايل</th>
                     <th>عدد المجموعات</th>
-                    <th></th>
+                    <th style="width:110px"></th>
                   </tr>
                 </thead>
                 <tbody id="teachers-table-body"></tbody>
@@ -632,6 +635,54 @@
           </div>
         </section>
 
+        <!-- النسخ الاحتياطية -->
+        <section class="page admin-only" id="page-backup" data-page="backup">
+          <div class="backup-container">
+            <div class="panel">
+              <div class="panel-head">
+                <h2>📋 النسخ الاحتياطية</h2>
+              </div>
+              <p class="panel-note">احفظ جميع بيانات السنتر (الطلاب، المعلمين، الحصص، الاختبارات، إلخ) في ملف JSON آمن، أو استعيد البيانات من نسخة محفوظة سابقة.</p>
+              
+              <div class="backup-actions">
+                <div class="backup-action-card">
+                  <div class="action-icon">📤</div>
+                  <h3>تصدير البيانات</h3>
+                  <p>احفظ جميع البيانات في ملف</p>
+                  <button type="button" class="btn btn-primary" id="export-btn">تصدير الآن</button>
+                </div>
+                
+                <div class="backup-action-card">
+                  <div class="action-icon">📥</div>
+                  <h3>استيراد البيانات</h3>
+                  <p>استعيد البيانات من ملف محفوظ</p>
+                  <input type="file" id="import-file-input" accept=".json" hidden>
+                  <button type="button" class="btn btn-primary" id="import-btn">استيراد من ملف</button>
+                </div>
+              </div>
+
+              <div class="backup-info">
+                <h4>معلومات مهمة:</h4>
+                <ul>
+                  <li>✓ الملف المُصدَّر يحتوي على جميع البيانات (آمن تماماً)</li>
+                  <li>✓ تأكد من حفظ النسخ الاحتياطية بشكل دوري</li>
+                  <li>✓ عند استيراد ملف قديم، ستُستبدل جميع البيانات الحالية</li>
+                  <li>⚠️ تنسيق الملف: JSON - تأكد من عدم تعديله يدويًا</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h2>سجل النسخ الاحتياطية</h2>
+              </div>
+              <div class="backup-history" id="backup-history">
+                <p class="empty-row">لا توجد نسخ احتياطية محفوظة محليًا</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- استمارات الطلاب الجدد -->
         <section class="page admin-only" id="page-registrations" data-page="registrations">
           <div class="panel">
@@ -679,6 +730,45 @@
 </div>
 
 <div class="toast" id="toast" hidden></div>
+
+<!-- مودال تعديل طالب -->
+<div class="modal-overlay" id="edit-student-modal-overlay" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>تعديل بيانات الطالب</h3>
+      <button type="button" class="modal-close" onclick="closeEditStudentModal()">✕</button>
+    </div>
+    <form id="edit-student-form" class="grid-form">
+      <input type="hidden" name="id">
+      <input type="text" name="name" placeholder="اسم الطالب" required>
+      <select name="classId" id="edit-student-class-select" required>
+        <option value="">اختر المجموعة</option>
+      </select>
+      <input type="tel" name="guardianPhone" placeholder="رقم ولي الأمر" required>
+      <input type="number" name="monthlyFee" placeholder="الشهرية (جنيه)" min="0" required>
+      <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+    </form>
+  </div>
+</div>
+
+<!-- مودال تعديل معلم -->
+<div class="modal-overlay" id="edit-teacher-modal-overlay" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>تعديل بيانات المعلم</h3>
+      <button type="button" class="modal-close" onclick="closeEditTeacherModal()">✕</button>
+    </div>
+    <form id="edit-teacher-form" class="grid-form">
+      <input type="hidden" name="id">
+      <input type="text" name="name" placeholder="اسم المعلم" required>
+      <input type="text" name="subject" placeholder="المادة" required>
+      <input type="tel" name="phone" placeholder="رقم الموبايل" required>
+      <input type="email" name="email" placeholder="البريد الإلكتروني" required>
+      <input type="password" name="password" placeholder="كلمة المرور (اتركها لو مش هتغيّرها)">
+      <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+    </form>
+  </div>
+</div>
 
 <script src="script.js"></script>
 </body>

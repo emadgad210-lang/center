@@ -484,6 +484,7 @@ function renderStudents() {
         </td>
         <td>
           <button class="icon-btn" onclick="viewStudentProfile('${s.id}')" title="عرض الملف">👁️</button>
+          <button class="icon-btn icon-btn-edit" onclick="openEditStudentModal('${s.id}')" title="تعديل">✏️</button>
           <button class="icon-btn" onclick="deleteStudent('${s.id}')" title="حذف">🗑️</button>
         </td>
       </tr>
@@ -518,6 +519,61 @@ function deleteStudent(id) {
     showToast('✅ تم حذف الطالب');
   }
 }
+
+// ---------- تعديل بيانات طالب ----------
+const editStudentModalOverlay = document.getElementById('edit-student-modal-overlay');
+const editStudentForm = document.getElementById('edit-student-form');
+
+function openEditStudentModal(id) {
+  if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
+
+  const student = studentById(id);
+  if (!student) return;
+
+  fillSelect(
+    document.getElementById('edit-student-class-select'),
+    data.classes.map(c => ({ id: c.id, label: c.name })),
+    'اختر المجموعة'
+  );
+
+  editStudentForm.elements['id'].value = student.id;
+  editStudentForm.elements['name'].value = student.name;
+  editStudentForm.elements['classId'].value = student.classId;
+  editStudentForm.elements['guardianPhone'].value = student.guardianPhone;
+  editStudentForm.elements['monthlyFee'].value = student.monthlyFee;
+
+  editStudentModalOverlay.hidden = false;
+}
+
+function closeEditStudentModal() {
+  editStudentModalOverlay.hidden = true;
+  editStudentForm.reset();
+}
+
+editStudentForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
+
+  const form = new FormData(editStudentForm);
+  const student = studentById(form.get('id'));
+  if (!student) return;
+
+  student.name = form.get('name');
+  student.classId = form.get('classId');
+  student.guardianPhone = form.get('guardianPhone');
+  const fee = parseFloat(form.get('monthlyFee'));
+  student.monthlyFee = isNaN(fee) || fee < 0 ? 0 : fee;
+
+  saveData();
+  closeEditStudentModal();
+  renderStudents();
+  renderFees();
+  showToast('✅ تم تحديث بيانات الطالب');
+});
+
+editStudentModalOverlay.addEventListener('click', (e) => {
+  if (e.target === editStudentModalOverlay) closeEditStudentModal();
+});
 
 // ========== ملف الطالب الفردي ==========
 function viewStudentProfile(studentId) {
@@ -663,6 +719,7 @@ function renderTeachers() {
         <td>${t.phone}</td>
         <td>${classCount}</td>
         <td>
+          <button class="icon-btn icon-btn-edit" onclick="openEditTeacherModal('${t.id}')" title="تعديل">✏️</button>
           <button class="icon-btn" onclick="deleteTeacher('${t.id}')" title="حذف">🗑️</button>
         </td>
       </tr>
@@ -688,6 +745,56 @@ function deleteTeacher(id) {
     showToast('✅ تم الحذف');
   }
 }
+
+// ---------- تعديل بيانات معلم ----------
+const editTeacherModalOverlay = document.getElementById('edit-teacher-modal-overlay');
+const editTeacherForm = document.getElementById('edit-teacher-form');
+
+function openEditTeacherModal(id) {
+  if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
+
+  const teacher = teacherById(id);
+  if (!teacher) return;
+
+  editTeacherForm.elements['id'].value = teacher.id;
+  editTeacherForm.elements['name'].value = teacher.name;
+  editTeacherForm.elements['subject'].value = teacher.subject;
+  editTeacherForm.elements['phone'].value = teacher.phone;
+  editTeacherForm.elements['email'].value = teacher.email;
+  editTeacherForm.elements['password'].value = '';
+
+  editTeacherModalOverlay.hidden = false;
+}
+
+function closeEditTeacherModal() {
+  editTeacherModalOverlay.hidden = true;
+  editTeacherForm.reset();
+}
+
+editTeacherForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
+
+  const form = new FormData(editTeacherForm);
+  const teacher = teacherById(form.get('id'));
+  if (!teacher) return;
+
+  teacher.name = form.get('name');
+  teacher.subject = form.get('subject');
+  teacher.phone = form.get('phone');
+  teacher.email = form.get('email');
+  const newPassword = form.get('password');
+  if (newPassword) teacher.password = newPassword;
+
+  saveData();
+  closeEditTeacherModal();
+  renderTeachers();
+  showToast('✅ تم تحديث بيانات المعلم');
+});
+
+editTeacherModalOverlay.addEventListener('click', (e) => {
+  if (e.target === editTeacherModalOverlay) closeEditTeacherModal();
+});
 
 // ========== الحصص ==========
 const classForm = document.getElementById('class-form');
@@ -1323,3 +1430,179 @@ document.getElementById('exam-form').date.valueAsDate = new Date();
 // فكانت صفحة الحضور تظل تعتقد أنه لا يوجد تاريخ مُختار ولا تعرض أي طالب
 // حتى يغيّر المستخدم التاريخ يدوياً. نُزامن المتغيّر مباشرةً هنا.
 currentAttendanceDate = document.getElementById('attendance-date').value;
+
+// ========== نظام النسخ الاحتياطية (Backup) ==========
+const BACKUPS_KEY = 'sabbora-backups';
+const MAX_BACKUPS = 10;
+
+// دالة تحميل البيانات المحفوظة من localStorage
+function loadBackups() {
+  const raw = localStorage.getItem(BACKUPS_KEY);
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+}
+
+// دالة حفظ النسخ الاحتياطية
+function saveBackups(backups) {
+  localStorage.setItem(BACKUPS_KEY, JSON.stringify(backups));
+}
+
+// دالة تصدير البيانات إلى ملف JSON
+function exportData() {
+  const timestamp = new Date().toLocaleString('ar-EG').replace(/:/g, '-');
+  const backupData = {
+    version: '1.0',
+    exportDate: new Date().toISOString(),
+    exportTime: new Date().toLocaleString('ar-EG'),
+    data: data
+  };
+  
+  const json = JSON.stringify(backupData, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sabbora-backup-${timestamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  // إضافة النسخة الاحتياطية إلى السجل
+  const backups = loadBackups();
+  backups.unshift({
+    id: Date.now(),
+    name: `sabbora-backup-${timestamp}.json`,
+    date: new Date().toLocaleString('ar-EG'),
+    size: (blob.size / 1024).toFixed(2) + ' KB',
+    type: 'تصدير يدوي'
+  });
+  
+  // الحفاظ على آخر 10 نسخ فقط
+  if (backups.length > MAX_BACKUPS) {
+    backups.pop();
+  }
+  saveBackups(backups);
+  
+  renderBackupHistory();
+  showToast('✅ تم تصدير البيانات بنجاح');
+}
+
+// دالة استيراد البيانات من ملف
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const content = e.target.result;
+      const backupData = JSON.parse(content);
+      
+      // التحقق من صحة الملف
+      if (!backupData.data || typeof backupData.data !== 'object') {
+        showToast('❌ صيغة الملف غير صحيحة');
+        return;
+      }
+      
+      // تأكيد من المستخدم
+      if (!confirm('⚠️ تحذير: سيتم استبدال جميع البيانات الحالية بالبيانات من الملف. هل أنت متأكد؟')) {
+        return;
+      }
+      
+      // استعادة البيانات
+      data = backupData.data;
+      saveData();
+      
+      // تحديث البيانات المعروضة
+      renderAll();
+      
+      showToast('✅ تم استيراد البيانات بنجاح');
+      
+      // إضافة للسجل
+      const backups = loadBackups();
+      backups.unshift({
+        id: Date.now(),
+        name: file.name,
+        date: new Date().toLocaleString('ar-EG'),
+        size: (file.size / 1024).toFixed(2) + ' KB',
+        type: 'استيراد يدوي'
+      });
+      
+      if (backups.length > MAX_BACKUPS) {
+        backups.pop();
+      }
+      saveBackups(backups);
+      renderBackupHistory();
+    } catch (err) {
+      showToast('❌ خطأ في قراءة الملف: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// دالة حذف نسخة احتياطية من السجل
+function deleteBackupFromHistory(id) {
+  const backups = loadBackups();
+  const index = backups.findIndex(b => b.id === id);
+  if (index > -1) {
+    backups.splice(index, 1);
+    saveBackups(backups);
+    renderBackupHistory();
+    showToast('✅ تم حذف النسخة من السجل');
+  }
+}
+
+// دالة عرض سجل النسخ الاحتياطية
+function renderBackupHistory() {
+  const historyContainer = document.getElementById('backup-history');
+  const backups = loadBackups();
+  
+  if (backups.length === 0) {
+    historyContainer.innerHTML = '<p class="empty-row">لا توجد نسخ احتياطية محفوظة محليًا</p>';
+    return;
+  }
+  
+  historyContainer.innerHTML = backups.map(backup => `
+    <div class="backup-item">
+      <div class="backup-item-info">
+        <div class="backup-item-name">📦 ${backup.name}</div>
+        <div class="backup-item-date">📅 ${backup.date} | 📊 ${backup.size} | 🏷️ ${backup.type}</div>
+      </div>
+      <div class="backup-item-actions">
+        <button class="backup-item-btn btn-danger" onclick="deleteBackupFromHistory(${backup.id})">حذف</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// معالجات الأحداث للنسخ الاحتياطية
+const exportBtn = document.getElementById('export-btn');
+const importBtn = document.getElementById('import-btn');
+const importFileInput = document.getElementById('import-file-input');
+
+exportBtn.addEventListener('click', () => {
+  if (confirm('هل تريد تصدير جميع البيانات الآن؟')) {
+    exportData();
+  }
+});
+
+importBtn.addEventListener('click', () => {
+  importFileInput.click();
+});
+
+importFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    importData(file);
+    importFileInput.value = ''; // إعادة تعيين الحقل
+  }
+});
+
+// عرض سجل النسخ الاحتياطية عند تحميل الصفحة
+window.addEventListener('load', () => {
+  renderBackupHistory();
+});
