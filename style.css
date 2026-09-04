@@ -270,6 +270,17 @@ body {
   color: white;
 }
 
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
 .btn-block {
   width: 100%;
   display: block;
@@ -797,6 +808,23 @@ body {
   color: var(--primary-dark);
 }
 
+.modal-box-sm {
+  max-width: 380px;
+}
+
+.confirm-modal-message {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 /* ========== البطاقات والألواح ========== */
 .panel {
   background: var(--bg-panel);
@@ -849,6 +877,48 @@ body {
 .search-input:focus {
   outline: none;
   border-color: var(--primary);
+}
+
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: rgba(129, 140, 248, 0.1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bulk-actions-bar[hidden] {
+  display: none;
+}
+
+.bulk-actions-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions-controls select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
 }
 
 /* ========== الإحصائيات ========== */

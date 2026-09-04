@@ -124,6 +124,9 @@
         <button class="nav-item admin-only" data-page="backup">
           <span class="nav-label">النسخ الاحتياطية</span>
         </button>
+        <button class="nav-item admin-only" data-page="settings">
+          <span class="nav-label">الإعدادات</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -264,12 +267,29 @@
           <div class="panel">
             <div class="panel-head">
               <h2>كل الطلاب</h2>
-              <input type="search" id="students-search" class="search-input" placeholder="دوّر باسم الطالب...">
+              <div class="panel-head-actions">
+                <input type="search" id="students-search" class="search-input" placeholder="دوّر باسم الطالب...">
+                <button type="button" class="btn btn-outline btn-sm" id="export-students-btn">📊 تصدير Excel</button>
+              </div>
             </div>
+
+            <div class="bulk-actions-bar" id="students-bulk-bar" hidden>
+              <span id="students-bulk-count">تم تحديد 0 طالب</span>
+              <div class="bulk-actions-controls">
+                <select id="students-bulk-move-select">
+                  <option value="">نقل المحدد إلى مجموعة...</option>
+                </select>
+                <button type="button" class="btn btn-outline btn-sm" id="students-bulk-move-btn">نقل</button>
+                <button type="button" class="btn btn-danger btn-sm" id="students-bulk-delete-btn">حذف المحدد</button>
+                <button type="button" class="btn btn-outline btn-sm" id="students-bulk-clear-btn">إلغاء التحديد</button>
+              </div>
+            </div>
+
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
+                    <th style="width:36px"><input type="checkbox" id="students-select-all"></th>
                     <th>الاسم</th>
                     <th>المجموعة</th>
                     <th>رقم ولي الأمر</th>
@@ -371,6 +391,10 @@
           <div class="panel">
             <div class="panel-head">
               <h2>كل المعلمين</h2>
+              <div class="panel-head-actions">
+                <input type="search" id="teachers-search" class="search-input" placeholder="دوّر باسم المعلم أو المادة...">
+                <button type="button" class="btn btn-outline btn-sm" id="export-teachers-btn">📊 تصدير Excel</button>
+              </div>
             </div>
             <div class="table-wrap">
               <table>
@@ -429,7 +453,7 @@
                     <th>الأيام</th>
                     <th>الميعاد</th>
                     <th>عدد الطلاب</th>
-                    <th></th>
+                    <th style="width:110px"></th>
                   </tr>
                 </thead>
                 <tbody id="classes-table-body"></tbody>
@@ -578,7 +602,10 @@
           <div class="panel">
             <div class="panel-head">
               <h2>متابعة شهريات — <span id="fees-month-label"></span></h2>
-              <input type="month" id="fees-month-picker">
+              <div class="panel-head-actions">
+                <input type="month" id="fees-month-picker">
+                <button type="button" class="btn btn-outline btn-sm" id="export-fees-btn">📊 تصدير Excel</button>
+              </div>
             </div>
             <div class="table-wrap">
               <table>
@@ -683,6 +710,33 @@
           </div>
         </section>
 
+        <!-- الإعدادات -->
+        <section class="page admin-only" id="page-settings" data-page="settings">
+          <div class="backup-container">
+            <div class="panel">
+              <div class="panel-head">
+                <h2>🔒 تغيير كلمة المرور</h2>
+              </div>
+              <p class="panel-note">غيّر كلمة مرور حساب الأدمن الخاص بك. لازم تدخل كلمة المرور الحالية الأول.</p>
+
+              <form id="change-password-form" class="grid-form">
+                <input type="password" name="currentPassword" placeholder="كلمة المرور الحالية" required autocomplete="current-password">
+                <input type="password" name="newPassword" placeholder="كلمة المرور الجديدة" required autocomplete="new-password" minlength="6">
+                <input type="password" name="confirmPassword" placeholder="تأكيد كلمة المرور الجديدة" required autocomplete="new-password" minlength="6">
+                <button type="submit" class="btn btn-primary">حفظ كلمة المرور الجديدة</button>
+              </form>
+
+              <div class="backup-info">
+                <h4>ملاحظات:</h4>
+                <ul>
+                  <li>✓ لازم تكون كلمة المرور الجديدة 6 حروف/أرقام على الأقل</li>
+                  <li>✓ هتستخدم كلمة المرور الجديدة من المرة الجاية اللي تسجّل فيها دخول</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- استمارات الطلاب الجدد -->
         <section class="page admin-only" id="page-registrations" data-page="registrations">
           <div class="panel">
@@ -770,6 +824,70 @@
   </div>
 </div>
 
+<!-- مودال تعديل مجموعة/حصة -->
+<div class="modal-overlay" id="edit-class-modal-overlay" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>تعديل بيانات المجموعة</h3>
+      <button type="button" class="modal-close" onclick="closeEditClassModal()">✕</button>
+    </div>
+    <form id="edit-class-form" class="grid-form">
+      <input type="hidden" name="id">
+      <input type="text" name="name" placeholder="اسم المجموعة" required>
+      <select name="teacherId" id="edit-class-teacher-select" required>
+        <option value="">اختر المعلم</option>
+      </select>
+      <input type="time" name="time" required>
+      <div class="days-picker" id="edit-days-picker">
+        <label><input type="checkbox" name="days" value="السبت"> السبت</label>
+        <label><input type="checkbox" name="days" value="الأحد"> الأحد</label>
+        <label><input type="checkbox" name="days" value="الإثنين"> الإثنين</label>
+        <label><input type="checkbox" name="days" value="الثلاثاء"> الثلاثاء</label>
+        <label><input type="checkbox" name="days" value="الأربعاء"> الأربعاء</label>
+        <label><input type="checkbox" name="days" value="الخميس"> الخميس</label>
+        <label><input type="checkbox" name="days" value="الجمعة"> الجمعة</label>
+      </div>
+      <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+    </form>
+  </div>
+</div>
+
+<!-- مودال تعديل اختبار -->
+<div class="modal-overlay" id="edit-exam-modal-overlay" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>تعديل بيانات الاختبار</h3>
+      <button type="button" class="modal-close" onclick="closeEditExamModal()">✕</button>
+    </div>
+    <form id="edit-exam-form" class="grid-form">
+      <input type="hidden" name="id">
+      <input type="text" name="title" placeholder="اسم الاختبار" required>
+      <select name="classId" id="edit-exam-class-select" required>
+        <option value="">اختر المجموعة</option>
+      </select>
+      <input type="date" name="date" required>
+      <input type="number" name="maxScore" placeholder="الدرجة الكاملة" min="1" required>
+      <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+    </form>
+  </div>
+</div>
+
+<!-- مودال تأكيد عام -->
+<div class="modal-overlay" id="confirm-modal-overlay" hidden>
+  <div class="modal-box modal-box-sm">
+    <div class="modal-head">
+      <h3 id="confirm-modal-title">تأكيد العملية</h3>
+      <button type="button" class="modal-close" onclick="closeConfirmModal()">✕</button>
+    </div>
+    <p class="confirm-modal-message" id="confirm-modal-message"></p>
+    <div class="confirm-modal-actions">
+      <button type="button" class="btn btn-outline" id="confirm-modal-cancel">إلغاء</button>
+      <button type="button" class="btn btn-danger" id="confirm-modal-confirm">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

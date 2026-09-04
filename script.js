@@ -34,6 +34,11 @@ function loadData() {
   };
 }
 
+// لو الأدمن غيّر كلمة المرور قبل كده، استخدم النسخة المحفوظة بدل الافتراضية
+if (data.adminPassword) {
+  DEMO_USERS['admin'].password = data.adminPassword;
+}
+
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -100,14 +105,14 @@ passwordToggleBtn.addEventListener('click', () => {
 
 // ========== تسجيل الخروج ==========
 document.getElementById('logout-btn').addEventListener('click', () => {
-  if (confirm('هل أنت متأكد من رغبتك في تسجيل الخروج؟')) {
+  showConfirmModal('هل أنت متأكد من رغبتك في تسجيل الخروج؟', () => {
     currentUser = null;
     localStorage.removeItem(AUTH_KEY);
     loginPage.hidden = false;
     dashboardWrapper.hidden = true;
     document.getElementById('login-form').reset();
     showToast('تم تسجيل الخروج بنجاح');
-  }
+  }, { title: 'تسجيل الخروج', confirmLabel: 'تسجيل الخروج' });
 });
 
 // ========== تحديث واجهة المستخدم بناءً على الدور ==========
@@ -149,7 +154,9 @@ const pageTitles = {
   fees: 'الشهريات',
   expenses: 'مصروفات السنتر',
   registrations: 'استمارات طلاب جدد',
-  'student-profile': 'ملف الطالب'
+  'student-profile': 'ملف الطالب',
+  backup: 'النسخ الاحتياطية',
+  settings: 'الإعدادات'
 };
 
 function goToPage(name) {
@@ -325,6 +332,39 @@ function showToast(message) {
   showToast._t = setTimeout(() => { toast.hidden = true; }, 2200);
 }
 
+// ---------- مودال التأكيد العام (بديل confirm الافتراضي) ----------
+const confirmModalOverlay = document.getElementById('confirm-modal-overlay');
+const confirmModalMessage = document.getElementById('confirm-modal-message');
+const confirmModalTitle = document.getElementById('confirm-modal-title');
+const confirmModalConfirmBtn = document.getElementById('confirm-modal-confirm');
+const confirmModalCancelBtn = document.getElementById('confirm-modal-cancel');
+let confirmModalCallback = null;
+
+function showConfirmModal(message, onConfirm, options = {}) {
+  confirmModalTitle.textContent = options.title || 'تأكيد العملية';
+  confirmModalMessage.textContent = message;
+  confirmModalConfirmBtn.textContent = options.confirmLabel || 'تأكيد';
+  confirmModalCallback = onConfirm;
+  confirmModalOverlay.hidden = false;
+}
+
+function closeConfirmModal() {
+  confirmModalOverlay.hidden = true;
+  confirmModalCallback = null;
+}
+
+confirmModalConfirmBtn.addEventListener('click', () => {
+  const callback = confirmModalCallback;
+  closeConfirmModal();
+  if (callback) callback();
+});
+
+confirmModalCancelBtn.addEventListener('click', closeConfirmModal);
+
+confirmModalOverlay.addEventListener('click', (e) => {
+  if (e.target === confirmModalOverlay) closeConfirmModal();
+});
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -451,6 +491,8 @@ function getDayName(dateStr) {
 }
 
 // ========== الطلاب ==========
+let selectedStudentIds = new Set();
+
 const studentForm = document.getElementById('student-form');
 studentForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -480,10 +522,15 @@ function renderStudents() {
 
   const filtered = data.students.filter(s => s.name.toLowerCase().includes(query));
 
+  // نحافظ فقط على تحديد الطلاب الموجودين فعليًا (بعد أي حذف)
+  const existingIds = new Set(data.students.map(s => s.id));
+  selectedStudentIds.forEach(id => { if (!existingIds.has(id)) selectedStudentIds.delete(id); });
+
   tbody.innerHTML = filtered.map(s => {
     const cls = classById(s.classId);
     return `
       <tr>
+        <td><input type="checkbox" class="student-row-check" value="${s.id}" ${selectedStudentIds.has(s.id) ? 'checked' : ''}></td>
         <td><strong>${s.name}</strong></td>
         <td>${cls?.name || 'غير محدد'}</td>
         <td>${s.guardianPhone}</td>
@@ -505,6 +552,18 @@ function renderStudents() {
 
   empty.hidden = filtered.length > 0;
 
+  tbody.querySelectorAll('.student-row-check').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      if (e.target.checked) selectedStudentIds.add(e.target.value);
+      else selectedStudentIds.delete(e.target.value);
+      updateStudentsBulkBar();
+    });
+  });
+
+  const selectAllCb = document.getElementById('students-select-all');
+  selectAllCb.checked = filtered.length > 0 && filtered.every(s => selectedStudentIds.has(s.id));
+  updateStudentsBulkBar();
+
   fillSelect(
     document.getElementById('student-class-select'),
     data.classes.map(c => ({ id: c.id, label: c.name })),
@@ -524,13 +583,154 @@ function updateStudentFee(id, value) {
 }
 
 function deleteStudent(id) {
-  if (confirm('هل أنت متأكد؟')) {
+  showConfirmModal('هل أنت متأكد من حذف هذا الطالب؟', () => {
     data.students = data.students.filter(s => s.id !== id);
+    selectedStudentIds.delete(id);
     saveData();
     renderStudents();
     showToast('✅ تم حذف الطالب');
+  }, { title: 'حذف طالب' });
+}
+
+// ---------- التحديد الجماعي للطلاب ----------
+const studentsBulkBar = document.getElementById('students-bulk-bar');
+const studentsBulkCount = document.getElementById('students-bulk-count');
+const studentsSelectAllCb = document.getElementById('students-select-all');
+
+function updateStudentsBulkBar() {
+  const count = selectedStudentIds.size;
+  studentsBulkBar.hidden = count === 0;
+  studentsBulkCount.textContent = `تم تحديد ${count} طالب`;
+
+  if (count > 0) {
+    fillSelect(
+      document.getElementById('students-bulk-move-select'),
+      data.classes.map(c => ({ id: c.id, label: c.name })),
+      'نقل المحدد إلى مجموعة...'
+    );
   }
 }
+
+studentsSelectAllCb.addEventListener('change', (e) => {
+  const query = document.getElementById('students-search').value.toLowerCase();
+  const filtered = data.students.filter(s => s.name.toLowerCase().includes(query));
+
+  if (e.target.checked) {
+    filtered.forEach(s => selectedStudentIds.add(s.id));
+  } else {
+    filtered.forEach(s => selectedStudentIds.delete(s.id));
+  }
+  renderStudents();
+  updateStudentsBulkBar();
+});
+
+document.getElementById('students-bulk-clear-btn').addEventListener('click', () => {
+  selectedStudentIds.clear();
+  renderStudents();
+  updateStudentsBulkBar();
+});
+
+document.getElementById('students-bulk-delete-btn').addEventListener('click', () => {
+  if (selectedStudentIds.size === 0) return;
+  const count = selectedStudentIds.size;
+
+  showConfirmModal(`هل أنت متأكد من حذف ${count} طالب؟ لا يمكن التراجع عن هذه العملية.`, () => {
+    data.students = data.students.filter(s => !selectedStudentIds.has(s.id));
+    selectedStudentIds.clear();
+    saveData();
+    renderStudents();
+    renderFees();
+    showToast('✅ تم حذف الطلاب المحددين');
+  }, { title: 'حذف جماعي', confirmLabel: 'حذف' });
+});
+
+document.getElementById('students-bulk-move-btn').addEventListener('click', () => {
+  if (selectedStudentIds.size === 0) return;
+
+  const targetClassId = document.getElementById('students-bulk-move-select').value;
+  if (!targetClassId) return showToast('اختر المجموعة المطلوب النقل إليها أولاً');
+
+  const count = selectedStudentIds.size;
+  const targetClass = classById(targetClassId);
+
+  showConfirmModal(`هل تريد نقل ${count} طالب إلى مجموعة "${targetClass?.name}"؟`, () => {
+    data.students.forEach(s => {
+      if (selectedStudentIds.has(s.id)) s.classId = targetClassId;
+    });
+    selectedStudentIds.clear();
+    saveData();
+    renderStudents();
+    showToast('✅ تم نقل الطلاب المحددين');
+  }, { title: 'نقل جماعي', confirmLabel: 'نقل' });
+});
+
+// ---------- تصدير الجداول إلى Excel ----------
+function exportToExcel(rows, headers, sheetName, filename) {
+  if (typeof XLSX === 'undefined') {
+    showToast('❌ تعذّر تحميل مكتبة التصدير، تأكد من اتصالك بالإنترنت');
+    return;
+  }
+  const sheetData = [headers, ...rows];
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  XLSX.writeFile(workbook, filename);
+}
+
+document.getElementById('export-students-btn').addEventListener('click', () => {
+  const rows = data.students.map(s => {
+    const cls = classById(s.classId);
+    return [s.name, cls?.name || 'غير محدد', s.guardianPhone, s.monthlyFee];
+  });
+  exportToExcel(
+    rows,
+    ['الاسم', 'المجموعة', 'رقم ولي الأمر', 'الشهرية'],
+    'الطلاب',
+    `طلاب_سبورة_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+  showToast('✅ تم تصدير جدول الطلاب');
+});
+
+document.getElementById('export-teachers-btn').addEventListener('click', () => {
+  const rows = data.teachers.map(t => {
+    const classCount = data.classes.filter(c => c.teacherId === t.id).length;
+    return [t.name, t.subject, t.email, t.phone, classCount];
+  });
+  exportToExcel(
+    rows,
+    ['الاسم', 'المادة', 'البريد الإلكتروني', 'رقم الموبايل', 'عدد المجموعات'],
+    'المعلمين',
+    `معلمين_سبورة_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+  showToast('✅ تم تصدير جدول المعلمين');
+});
+
+document.getElementById('export-fees-btn').addEventListener('click', () => {
+  const month = document.getElementById('fees-month-picker').value || new Date().toISOString().slice(0, 7);
+
+  const rows = data.students.map(s => {
+    const cls = classById(s.classId);
+    const paymentKey = `${month}_${s.id}`;
+    const payment = data.payments[paymentKey];
+    const isPaid = typeof payment === 'object' ? !!payment.paid : !!payment;
+    const method = typeof payment === 'object' ? (payment.method || 'cash') : 'cash';
+    return [
+      s.name,
+      cls?.name || 'غير محدد',
+      s.monthlyFee,
+      isPaid ? 'مدفوع' : 'قيد الانتظار',
+      isPaid ? (method === 'cash' ? 'كاش' : 'فودافون كاش') : '—'
+    ];
+  });
+
+  exportToExcel(
+    rows,
+    ['الطالب', 'المجموعة', 'الشهرية', 'الحالة', 'طريقة الدفع'],
+    'الشهريات',
+    `شهريات_سبورة_${month}.xlsx`
+  );
+  showToast('✅ تم تصدير جدول الشهريات');
+});
 
 // ---------- تعديل بيانات طالب ----------
 const editStudentModalOverlay = document.getElementById('edit-student-modal-overlay');
@@ -720,8 +920,13 @@ teacherForm.addEventListener('submit', (e) => {
 function renderTeachers() {
   const tbody = document.getElementById('teachers-table-body');
   const empty = document.getElementById('teachers-empty');
+  const query = document.getElementById('teachers-search').value.toLowerCase();
 
-  tbody.innerHTML = data.teachers.map(t => {
+  const filtered = data.teachers.filter(t =>
+    t.name.toLowerCase().includes(query) || t.subject.toLowerCase().includes(query)
+  );
+
+  tbody.innerHTML = filtered.map(t => {
     const classCount = data.classes.filter(c => c.teacherId === t.id).length;
     return `
       <tr data-teacher-row="${t.id}">
@@ -738,7 +943,7 @@ function renderTeachers() {
     `;
   }).join('');
 
-  empty.hidden = data.teachers.length > 0;
+  empty.hidden = filtered.length > 0;
 
   fillSelect(
     document.getElementById('class-teacher-select'),
@@ -748,14 +953,14 @@ function renderTeachers() {
 }
 
 function deleteTeacher(id) {
-  if (confirm('حذف المعلم سيؤثر على حصصه. متأكد؟')) {
+  showConfirmModal('حذف المعلم سيؤثر على حصصه. هل أنت متأكد؟', () => {
     data.teachers = data.teachers.filter(t => t.id !== id);
     data.classes = data.classes.filter(c => c.teacherId !== id);
     saveData();
     renderTeachers();
     renderClasses();
     showToast('✅ تم الحذف');
-  }
+  }, { title: 'حذف معلم' });
 }
 
 // ---------- تعديل بيانات معلم ----------
@@ -814,7 +1019,7 @@ classForm.addEventListener('submit', (e) => {
   e.preventDefault();
   if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
 
-  const days = Array.from(document.querySelectorAll('[name="days"]:checked')).map(cb => cb.value);
+  const days = Array.from(classForm.querySelectorAll('[name="days"]:checked')).map(cb => cb.value);
   const cls = {
     id: uid(),
     name: classForm.name.value,
@@ -845,6 +1050,7 @@ function renderClasses() {
         <td>${c.time}</td>
         <td>${studentCount}</td>
         <td>
+          <button class="icon-btn icon-btn-edit" onclick="openEditClassModal('${c.id}')" title="تعديل">✏️</button>
           <button class="icon-btn" onclick="deleteClass('${c.id}')" title="حذف">🗑️</button>
         </td>
       </tr>
@@ -861,14 +1067,69 @@ function renderClasses() {
 }
 
 function deleteClass(id) {
-  if (confirm('حذف المجموعة سيؤثر على سجلات الحضور. متأكد؟')) {
+  showConfirmModal('حذف المجموعة سيؤثر على سجلات الحضور. هل أنت متأكد؟', () => {
     data.classes = data.classes.filter(c => c.id !== id);
     saveData();
     renderClasses();
     renderStudents();
     showToast('✅ تم الحذف');
-  }
+  }, { title: 'حذف مجموعة' });
 }
+
+// ---------- تعديل بيانات مجموعة/حصة ----------
+const editClassModalOverlay = document.getElementById('edit-class-modal-overlay');
+const editClassForm = document.getElementById('edit-class-form');
+
+function openEditClassModal(id) {
+  if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
+
+  const cls = classById(id);
+  if (!cls) return;
+
+  fillSelect(
+    document.getElementById('edit-class-teacher-select'),
+    data.teachers.map(t => ({ id: t.id, label: t.name })),
+    'اختر المعلم'
+  );
+
+  editClassForm.elements['id'].value = cls.id;
+  editClassForm.elements['name'].value = cls.name;
+  editClassForm.elements['teacherId'].value = cls.teacherId;
+  editClassForm.elements['time'].value = cls.time;
+
+  editClassForm.querySelectorAll('[name="days"]').forEach(cb => {
+    cb.checked = cls.days.includes(cb.value);
+  });
+
+  editClassModalOverlay.hidden = false;
+}
+
+function closeEditClassModal() {
+  editClassModalOverlay.hidden = true;
+  editClassForm.reset();
+}
+
+editClassForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
+
+  const cls = classById(editClassForm.elements['id'].value);
+  if (!cls) return;
+
+  cls.name = editClassForm.elements['name'].value;
+  cls.teacherId = editClassForm.elements['teacherId'].value;
+  cls.time = editClassForm.elements['time'].value;
+  cls.days = Array.from(editClassForm.querySelectorAll('[name="days"]:checked')).map(cb => cb.value);
+
+  saveData();
+  closeEditClassModal();
+  renderClasses();
+  showToast('✅ تم تحديث بيانات المجموعة');
+});
+
+editClassModalOverlay.addEventListener('click', (e) => {
+  if (e.target === editClassModalOverlay) closeEditClassModal();
+});
 
 // ========== الحضور والغياب مع WhatsApp ==========
 let currentAttendanceClass = null;
@@ -1001,6 +1262,7 @@ function renderExams() {
         <td>${avg}</td>
         <td>
           <button class="icon-btn" onclick="openExamScores('${ex.id}')" title="رصد الدرجات">📝</button>
+          <button class="icon-btn icon-btn-edit" onclick="openEditExamModal('${ex.id}')" title="تعديل">✏️</button>
           <button class="icon-btn" onclick="deleteExam('${ex.id}')" title="حذف">🗑️</button>
         </td>
       </tr>
@@ -1017,13 +1279,62 @@ function renderExams() {
 }
 
 function deleteExam(id) {
-  if (confirm('هل أنت متأكد؟')) {
+  showConfirmModal('هل أنت متأكد من حذف هذا الاختبار؟', () => {
     data.exams = data.exams.filter(ex => ex.id !== id);
     saveData();
     renderExams();
     showToast('✅ تم حذف الاختبار');
-  }
+  }, { title: 'حذف اختبار' });
 }
+
+// ---------- تعديل بيانات اختبار ----------
+const editExamModalOverlay = document.getElementById('edit-exam-modal-overlay');
+const editExamForm = document.getElementById('edit-exam-form');
+
+function openEditExamModal(id) {
+  const exam = data.exams.find(ex => ex.id === id);
+  if (!exam) return;
+
+  fillSelect(
+    document.getElementById('edit-exam-class-select'),
+    data.classes.map(c => ({ id: c.id, label: c.name })),
+    'اختر المجموعة'
+  );
+
+  editExamForm.elements['id'].value = exam.id;
+  editExamForm.elements['title'].value = exam.title;
+  editExamForm.elements['classId'].value = exam.classId;
+  editExamForm.elements['date'].value = exam.date;
+  editExamForm.elements['maxScore'].value = exam.maxScore;
+
+  editExamModalOverlay.hidden = false;
+}
+
+function closeEditExamModal() {
+  editExamModalOverlay.hidden = true;
+  editExamForm.reset();
+}
+
+editExamForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+
+  const exam = data.exams.find(ex => ex.id === editExamForm.elements['id'].value);
+  if (!exam) return;
+
+  exam.title = editExamForm.elements['title'].value;
+  exam.classId = editExamForm.elements['classId'].value;
+  exam.date = editExamForm.elements['date'].value;
+  exam.maxScore = Number(editExamForm.elements['maxScore'].value);
+
+  saveData();
+  closeEditExamModal();
+  renderExams();
+  showToast('✅ تم تحديث بيانات الاختبار');
+});
+
+editExamModalOverlay.addEventListener('click', (e) => {
+  if (e.target === editExamModalOverlay) closeEditExamModal();
+});
 
 let currentExamId = null;
 let changedExamScores = {};
@@ -1132,12 +1443,12 @@ function renderHolidays() {
 }
 
 function deleteHoliday(id) {
-  if (confirm('هل أنت متأكد؟')) {
+  showConfirmModal('هل أنت متأكد من حذف هذه الإجازة؟', () => {
     data.holidays = data.holidays.filter(h => h.id !== id);
     saveData();
     renderHolidays();
     showToast('✅ تم الحذف');
-  }
+  }, { title: 'حذف إجازة' });
 }
 
 // ========== الشهريات ==========
@@ -1307,12 +1618,12 @@ function renderExpenses() {
 }
 
 function deleteExpense(id) {
-  if (confirm('هل أنت متأكد؟')) {
+  showConfirmModal('هل أنت متأكد من حذف هذا المصروف؟', () => {
     data.expenses = data.expenses.filter(e => e.id !== id);
     saveData();
     renderExpenses();
     showToast('✅ تم الحذف');
-  }
+  }, { title: 'حذف مصروف' });
 }
 
 // ========== الاستمارات ==========
@@ -1392,16 +1703,19 @@ function approveRegistration(regId) {
 }
 
 function deleteRegistration(regId) {
-  if (confirm('هل أنت متأكد؟')) {
+  showConfirmModal('هل أنت متأكد من رفض وحذف هذه الاستمارة؟', () => {
     data.registrations = data.registrations.filter(r => r.id !== regId);
     saveData();
     renderRegistrations();
     showToast('✅ تم الحذف');
-  }
+  }, { title: 'رفض استمارة' });
 }
 
 // ========== البحث في الطلاب ==========
 document.getElementById('students-search').addEventListener('input', renderStudents);
+
+// ========== البحث في المعلمين ==========
+document.getElementById('teachers-search').addEventListener('input', renderTeachers);
 
 // ========== العرض الشامل ==========
 function renderAll() {
@@ -1523,34 +1837,32 @@ function importData(file) {
       }
       
       // تأكيد من المستخدم
-      if (!confirm('⚠️ تحذير: سيتم استبدال جميع البيانات الحالية بالبيانات من الملف. هل أنت متأكد؟')) {
-        return;
-      }
-      
-      // استعادة البيانات
-      data = backupData.data;
-      saveData();
-      
-      // تحديث البيانات المعروضة
-      renderAll();
-      
-      showToast('✅ تم استيراد البيانات بنجاح');
-      
-      // إضافة للسجل
-      const backups = loadBackups();
-      backups.unshift({
-        id: Date.now(),
-        name: file.name,
-        date: new Date().toLocaleString('ar-EG'),
-        size: (file.size / 1024).toFixed(2) + ' KB',
-        type: 'استيراد يدوي'
-      });
-      
-      if (backups.length > MAX_BACKUPS) {
-        backups.pop();
-      }
-      saveBackups(backups);
-      renderBackupHistory();
+      showConfirmModal('⚠️ تحذير: سيتم استبدال جميع البيانات الحالية بالبيانات من الملف. هل أنت متأكد؟', () => {
+        // استعادة البيانات
+        data = backupData.data;
+        saveData();
+
+        // تحديث البيانات المعروضة
+        renderAll();
+
+        showToast('✅ تم استيراد البيانات بنجاح');
+
+        // إضافة للسجل
+        const backups = loadBackups();
+        backups.unshift({
+          id: Date.now(),
+          name: file.name,
+          date: new Date().toLocaleString('ar-EG'),
+          size: (file.size / 1024).toFixed(2) + ' KB',
+          type: 'استيراد يدوي'
+        });
+
+        if (backups.length > MAX_BACKUPS) {
+          backups.pop();
+        }
+        saveBackups(backups);
+        renderBackupHistory();
+      }, { title: 'استيراد بيانات', confirmLabel: 'استيراد واستبدال' });
     } catch (err) {
       showToast('❌ خطأ في قراءة الملف: ' + err.message);
     }
@@ -1599,9 +1911,9 @@ const importBtn = document.getElementById('import-btn');
 const importFileInput = document.getElementById('import-file-input');
 
 exportBtn.addEventListener('click', () => {
-  if (confirm('هل تريد تصدير جميع البيانات الآن؟')) {
+  showConfirmModal('هل تريد تصدير جميع البيانات الآن؟', () => {
     exportData();
-  }
+  }, { title: 'تصدير البيانات', confirmLabel: 'تصدير' });
 });
 
 importBtn.addEventListener('click', () => {
@@ -1619,4 +1931,39 @@ importFileInput.addEventListener('change', (e) => {
 // عرض سجل النسخ الاحتياطية عند تحميل الصفحة
 window.addEventListener('load', () => {
   renderBackupHistory();
+});
+
+// ========== تغيير كلمة مرور الأدمن ==========
+const changePasswordForm = document.getElementById('change-password-form');
+
+changePasswordForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+
+  if (currentUser.role !== 'admin') return showToast('لا توجد صلاحيات');
+
+  const form = new FormData(changePasswordForm);
+  const currentPassword = form.get('currentPassword');
+  const newPassword = form.get('newPassword');
+  const confirmPassword = form.get('confirmPassword');
+
+  const adminUsername = Object.keys(DEMO_USERS).find(u => DEMO_USERS[u].role === 'admin');
+
+  if (DEMO_USERS[adminUsername].password !== currentPassword) {
+    return showToast('❌ كلمة المرور الحالية غير صحيحة');
+  }
+
+  if (newPassword.length < 6) {
+    return showToast('❌ كلمة المرور الجديدة لازم تكون 6 حروف على الأقل');
+  }
+
+  if (newPassword !== confirmPassword) {
+    return showToast('❌ كلمة المرور الجديدة وتأكيدها غير متطابقين');
+  }
+
+  DEMO_USERS[adminUsername].password = newPassword;
+  data.adminPassword = newPassword;
+  saveData();
+
+  changePasswordForm.reset();
+  showToast('✅ تم تغيير كلمة المرور بنجاح');
 });
