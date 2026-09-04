@@ -402,16 +402,28 @@ function renderAdminDashboard() {
     holidayDiv.innerHTML = '<p class="empty-row">مفيش إجازات مسجّلة</p>';
   }
 
-  const regBadge = document.getElementById('reg-badge');
-  const pendingCount = data.registrations.filter(r => !r.approved).length;
-  regBadge.textContent = pendingCount;
-  regBadge.hidden = pendingCount === 0;
+  updateRegBadge();
 
   const pendingList = document.getElementById('pending-regs-list');
   const pending = data.registrations.filter(r => !r.approved).slice(0, 5);
   pendingList.innerHTML = pending.length ? pending.map(r =>
     `<li><strong>${r.studentName}</strong> (ولي الأمر: ${r.guardianName})</li>`
   ).join('') : '<li class="empty-row">مفيش استمارات جديدة</li>';
+}
+
+function updateRegBadge() {
+  const regBadge = document.getElementById('reg-badge');
+  const pendingCount = data.registrations.filter(r => !r.approved).length;
+  const wasHidden = regBadge.hidden;
+
+  regBadge.textContent = pendingCount;
+  regBadge.hidden = pendingCount === 0;
+
+  if (!regBadge.hidden && wasHidden) {
+    regBadge.classList.remove('nav-badge-pop');
+    void regBadge.offsetWidth; // إعادة تشغيل الأنيميشن
+    regBadge.classList.add('nav-badge-pop');
+  }
 }
 
 function renderTeacherDashboard() {
@@ -1355,6 +1367,8 @@ function renderRegistrations() {
     data.classes.map(c => ({ id: c.id, label: c.name })),
     'اختر المجموعة'
   );
+
+  updateRegBadge();
 }
 
 function approveRegistration(regId) {
