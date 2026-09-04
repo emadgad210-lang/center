@@ -90,14 +90,11 @@ loginForm.addEventListener('submit', (e) => {
 // ========== إظهار/إخفاء كلمة المرور ==========
 const passwordToggleBtn = document.getElementById('password-toggle-btn');
 const passwordInput = document.getElementById('login-password');
-const eyeIcon = document.getElementById('eye-icon');
-const eyeOffIcon = document.getElementById('eye-off-icon');
 
 passwordToggleBtn.addEventListener('click', () => {
   const isHidden = passwordInput.type === 'password';
   passwordInput.type = isHidden ? 'text' : 'password';
-  eyeIcon.hidden = isHidden;
-  eyeOffIcon.hidden = !isHidden;
+  passwordToggleBtn.classList.toggle('is-active', isHidden);
   passwordToggleBtn.setAttribute('aria-label', isHidden ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور');
 });
 
@@ -284,30 +281,32 @@ document.addEventListener('click', (e) => {
 
 // ========== تبديل الوضع الداكن/الفاتح ==========
 const THEME_KEY = 'sabbora-theme';
-const themeToggleBtn = document.getElementById('theme-toggle-btn');
-const themeIconMoon = document.getElementById('theme-icon-moon');
-const themeIconSun = document.getElementById('theme-icon-sun');
+const themeBtnDark = document.getElementById('theme-btn-dark');
+const themeBtnLight = document.getElementById('theme-btn-light');
 
 function applyTheme(theme) {
   if (theme === 'light') {
     document.documentElement.setAttribute('data-theme', 'light');
-    themeIconMoon.hidden = true;
-    themeIconSun.hidden = false;
+    themeBtnLight.classList.add('is-active');
+    themeBtnDark.classList.remove('is-active');
   } else {
     document.documentElement.removeAttribute('data-theme');
-    themeIconMoon.hidden = false;
-    themeIconSun.hidden = true;
+    themeBtnDark.classList.add('is-active');
+    themeBtnLight.classList.remove('is-active');
   }
 }
 
 const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
 applyTheme(savedTheme);
 
-themeToggleBtn.addEventListener('click', () => {
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const newTheme = isLight ? 'dark' : 'light';
-  applyTheme(newTheme);
-  localStorage.setItem(THEME_KEY, newTheme);
+themeBtnDark.addEventListener('click', () => {
+  applyTheme('dark');
+  localStorage.setItem(THEME_KEY, 'dark');
+});
+
+themeBtnLight.addEventListener('click', () => {
+  applyTheme('light');
+  localStorage.setItem(THEME_KEY, 'light');
 });
 
 // ========== التاريخ والوقت ==========
@@ -348,6 +347,21 @@ function callGuardian(phone, studentName) {
     return;
   }
   window.location.href = `tel:${phone}`;
+}
+
+// ========== إبلاغ ولي الأمر (واتساب) ==========
+function whatsAppGuardian(phone, studentName) {
+  if (!phone) {
+    showToast('❌ لا يوجد رقم ولي أمر مسجّل');
+    return;
+  }
+
+  let digits = phone.replace(/[^\d]/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('0') && digits.length === 11) digits = '20' + digits.slice(1);
+
+  const message = `السلام عليكم، بخصوص الطالب/ة ${studentName} في السنتر.`;
+  window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, '_blank');
 }
 
 // ========== الرئيسية (الداشبورد) ==========
@@ -780,7 +794,7 @@ function renderAttendance() {
           </select>
         </td>
         <td>
-          <button type="button" class="btn btn-outline btn-sm" onclick="callGuardian('${s.guardianPhone}', '${s.name}')">📞 إبلاغ ولي الأمر</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="whatsAppGuardian('${s.guardianPhone}', '${s.name}')">💬 واتساب ولي الأمر</button>
         </td>
       </tr>
     `;
@@ -1022,7 +1036,9 @@ function renderFees() {
   tbody.innerHTML = data.students.map(s => {
     const cls = classById(s.classId);
     const paymentKey = `${month}_${s.id}`;
-    const isPaid = data.payments[paymentKey] || false;
+    const payment = data.payments[paymentKey];
+    const isPaid = typeof payment === 'object' ? !!payment.paid : !!payment;
+    const method = typeof payment === 'object' ? (payment.method || 'cash') : 'cash';
 
     return `
       <tr>
@@ -1036,17 +1052,40 @@ function renderFees() {
             ${isPaid ? '✓ مدفوع' : '⏳ قيد الانتظار'}
           </label>
         </td>
+        <td>
+          <select class="payment-method-select" ${isPaid ? '' : 'disabled'}
+            onchange="setPaymentMethod('${paymentKey}', this.value)">
+            <option value="cash" ${method === 'cash' ? 'selected' : ''}>كاش</option>
+            <option value="vodafone_cash" ${method === 'vodafone_cash' ? 'selected' : ''}>فودافون كاش</option>
+          </select>
+        </td>
       </tr>
     `;
   }).join('');
 
   empty.hidden = data.students.length > 0;
 
-  const paid = data.students.filter(s => data.payments[`${month}_${s.id}`]).length;
+  function isPaidEntry(key) {
+    const p = data.payments[key];
+    return typeof p === 'object' ? !!p.paid : !!p;
+  }
+
+  function paymentMethodOf(key) {
+    const p = data.payments[key];
+    return typeof p === 'object' ? (p.method || 'cash') : 'cash';
+  }
+
+  const paid = data.students.filter(s => isPaidEntry(`${month}_${s.id}`)).length;
   const total = data.students.length;
   const totalAmount = data.students.reduce((sum, s) => sum + s.monthlyFee, 0);
-  const paidAmount = data.students
-    .filter(s => data.payments[`${month}_${s.id}`])
+  const paidStudents = data.students.filter(s => isPaidEntry(`${month}_${s.id}`));
+  const paidAmount = paidStudents.reduce((sum, s) => sum + s.monthlyFee, 0);
+
+  const cashAmount = paidStudents
+    .filter(s => paymentMethodOf(`${month}_${s.id}`) === 'cash')
+    .reduce((sum, s) => sum + s.monthlyFee, 0);
+  const vodafoneCashAmount = paidStudents
+    .filter(s => paymentMethodOf(`${month}_${s.id}`) === 'vodafone_cash')
     .reduce((sum, s) => sum + s.monthlyFee, 0);
 
   const monthExpenses = data.expenses
@@ -1069,6 +1108,12 @@ function renderFees() {
         <strong>نسبة التحصيل:</strong> ${total > 0 ? ((paid / total) * 100).toFixed(1) : 0}%
       </div>
       <div class="summary-item">
+        <strong>كاش:</strong> ${cashAmount} ج
+      </div>
+      <div class="summary-item">
+        <strong>فودافون كاش:</strong> ${vodafoneCashAmount} ج
+      </div>
+      <div class="summary-item">
         <strong>مصروفات الشهر:</strong> ${monthExpenses} ج
       </div>
       <div class="summary-item ${netProfit >= 0 ? 'profit-positive' : 'profit-negative'}">
@@ -1079,10 +1124,20 @@ function renderFees() {
 }
 
 function togglePayment(paymentKey, isPaid) {
-  data.payments[paymentKey] = isPaid;
+  const existing = data.payments[paymentKey];
+  const method = typeof existing === 'object' ? existing.method : 'cash';
+  data.payments[paymentKey] = { paid: isPaid, method: method || 'cash' };
   saveData();
   renderFees();
   showToast('✅ تم تحديث حالة الدفع');
+}
+
+function setPaymentMethod(paymentKey, method) {
+  const existing = data.payments[paymentKey];
+  const isPaid = typeof existing === 'object' ? existing.paid : !!existing;
+  data.payments[paymentKey] = { paid: isPaid, method };
+  saveData();
+  showToast('✅ تم تحديث طريقة الدفع');
 }
 
 // ========== المصروفات ==========

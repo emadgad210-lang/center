@@ -174,6 +174,10 @@ body {
   background: rgba(129, 140, 248, 0.12);
 }
 
+.password-toggle-btn.is-active {
+  color: var(--primary);
+}
+
 .form-group input::placeholder {
   color: #6b7290;
 }
@@ -291,17 +295,38 @@ body {
   transform: scale(1.2);
 }
 
-#theme-toggle-btn {
-  color: var(--text-light);
+.theme-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.theme-toggle-option {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-#theme-toggle-btn:hover {
-  color: var(--primary-light);
-  background: rgba(129, 140, 248, 0.12);
+.theme-toggle-option:hover {
+  color: var(--text);
+}
+
+.theme-toggle-option.is-active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow);
 }
 
 .icon-btn-approve {
@@ -1248,6 +1273,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .fee-edit span {
   color: var(--text-light);
   font-size: 13px;
+}
+
+.payment-method-select {
+  width: auto;
+  min-width: 130px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.payment-method-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ========== الاستجابة للشاشات الصغيرة ========== */
