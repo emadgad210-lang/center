@@ -291,6 +291,19 @@ body {
   transform: scale(1.2);
 }
 
+#theme-toggle-btn {
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+#theme-toggle-btn:hover {
+  color: var(--primary-light);
+  background: rgba(129, 140, 248, 0.12);
+}
+
 .icon-btn-approve {
   color: var(--success);
   font-weight: bold;
